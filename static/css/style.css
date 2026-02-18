@@ -2641,21 +2641,21 @@ body::before {
     margin: 14px 20px 0;
     padding: 8px;
     border-radius: 22px;
-    background: #ffffff;
-    border: 1px solid rgba(123, 140, 176, 0.26);
-    box-shadow: 0 10px 26px rgba(56, 72, 116, 0.12);
+    background: linear-gradient(180deg, #ffffff 0%, #f7f9fe 100%);
+    border: 1px solid rgba(115, 132, 164, 0.24);
+    box-shadow: 0 10px 24px rgba(45, 62, 102, 0.1);
 }
 
 .top-nav-scroll {
-    --nav-accent-start: #2a86f2;
-    --nav-accent-end: #1b6fdb;
+    --nav-accent-start: #ECEFF3;
+    --nav-accent-end: #E3E8EE;
     position: relative;
     display: flex;
     gap: 2px;
     overflow-x: auto;
     padding: 4px;
     border-radius: 16px;
-    background: #e8ecf2;
+    background: linear-gradient(180deg, #edf1f8 0%, #e7ecf5 100%);
     scrollbar-width: none;
 }
 
@@ -2667,7 +2667,9 @@ body::before {
     height: calc(100% - 8px);
     border-radius: 12px;
     background: linear-gradient(135deg, var(--nav-accent-start) 0%, var(--nav-accent-end) 100%);
-    box-shadow: 0 8px 18px rgba(42, 134, 242, 0.32);
+    box-sizing: border-box;
+    border: 1px solid #d0d8e2;
+    box-shadow: 0 3px 8px rgba(58, 71, 92, 0.1);
     transform: translate3d(0, 0, 0);
     opacity: 0;
     z-index: 1;
@@ -2694,13 +2696,13 @@ body::before {
     border-radius: 12px !important;
     border: 1px solid transparent !important;
     background: transparent !important;
-    color: #667892 !important;
+    color: #64748b !important;
     justify-content: center !important;
     align-items: center;
     position: relative;
     z-index: 2;
     gap: 0;
-    transition: color 0.22s ease, text-shadow 0.22s ease, transform 0.2s ease;
+    transition: color 0.22s ease, text-shadow 0.22s ease, transform 0.2s ease, background 0.2s ease;
     transform: translateY(0) scale(1);
     white-space: nowrap;
 }
@@ -2724,8 +2726,8 @@ body::before {
 
 .top-nav-shell .sidebar-icon.nav-pill .label-main {
     font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-weight: 650;
+    letter-spacing: 0.015em;
     color: inherit;
     line-height: 1.1;
 }
@@ -2735,17 +2737,18 @@ body::before {
 }
 
 .top-nav-shell .sidebar-icon.nav-pill:hover {
-    background: rgba(255, 255, 255, 0.55) !important;
+    background: rgba(255, 255, 255, 0.7) !important;
+    color: #3f4d64 !important;
     transform: translateY(-1px) scale(1.01);
 }
 
 .top-nav-shell .sidebar-icon.nav-pill.active {
-    color: #ffffff !important;
+    color: #2f3a46 !important;
     border-color: transparent !important;
     background: transparent !important;
     box-shadow: none !important;
     transform: translateY(0) scale(1);
-    text-shadow: 0 1px 4px rgba(21, 34, 74, 0.3);
+    text-shadow: none;
 }
 
 .top-nav-shell .sidebar-icon.nav-pill:active {
@@ -2758,48 +2761,35 @@ body::before {
 
 .top-nav-shell .sidebar-icon.nav-pill.active .label-main,
 .top-nav-shell .sidebar-icon.nav-pill.active .label-sub {
-    color: #fff;
-}
-
-.top-nav-shell .sidebar-icon[data-section="news"] {
-    color: #7d90aa !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="indices"] {
-    color: #3f7ed6 !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="gold-realtime"] {
-    color: #2da86f !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="gold-history"] {
-    color: #aa6ad5 !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="volume"] {
-    color: #f39a2f !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="timing"] {
-    color: #0f8cbe !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="funds"] {
-    color: #2b73d6 !important;
-}
-
-.top-nav-shell .sidebar-icon[data-section="sectors"] {
-    color: #16a368 !important;
+    color: #2f3a46;
 }
 
 .top-nav-shell .sidebar-icon[data-section="query"] {
-    color: #f0a339 !important;
     min-width: 146px;
 }
 
 .app-layout-topnav .content-header {
-    margin-top: 12px !important;
+    margin-top: 8px !important;
+    padding: 10px 16px !important;
+    border-radius: 14px;
+}
+
+.app-layout-topnav .content-header .header-left {
+    gap: 10px;
+}
+
+.app-layout-topnav .content-header .section-title {
+    font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+    line-height: 1.1;
+}
+
+.app-layout-topnav .content-header .market-status {
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+.app-layout-topnav .content-header .last-update {
+    font-size: 11px;
 }
 
 .app-layout-topnav .content-section {
@@ -2875,6 +2865,25 @@ body::before {
     }
 
     .app-layout-topnav .content-header {
-        margin-top: 8px !important;
+        margin-top: 6px !important;
+        padding: 8px 12px !important;
+        border-radius: 12px;
+    }
+
+    .app-layout-topnav .content-header .header-left {
+        gap: 8px;
+    }
+
+    .app-layout-topnav .content-header .section-title {
+        font-size: 1rem;
+    }
+
+    .app-layout-topnav .content-header .market-status {
+        font-size: 10px;
+        padding: 2px 7px;
+    }
+
+    .app-layout-topnav .content-header .last-update {
+        font-size: 10px;
     }
 }

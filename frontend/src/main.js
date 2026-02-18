@@ -1,13 +1,13 @@
 const SECTION_META = {
-  news: { tabId: 'kx', title: '7*24快讯', showSummary: false },
-  indices: { tabId: 'marker', title: '全球指数', showSummary: false },
-  'gold-realtime': { tabId: 'real_time_gold', title: '实时贵金属', showSummary: false },
-  'gold-history': { tabId: 'gold', title: '历史金价', showSummary: false },
-  volume: { tabId: 'seven_A', title: '成交量趋势', showSummary: false },
-  timing: { tabId: 'A', title: '上证分时', showSummary: false },
-  funds: { tabId: 'fund', title: '自选基金', showSummary: true },
-  sectors: { tabId: 'bk', title: '行业板块', showSummary: false },
-  query: { tabId: 'select_fund', title: '板块基金查询', showSummary: false }
+  news: { tabId: 'kx', title: '7*24快讯', showSummary: false, showHeader: false },
+  indices: { tabId: 'marker', title: '全球指数', showSummary: false, showHeader: false },
+  'gold-realtime': { tabId: 'real_time_gold', title: '实时贵金属', showSummary: false, showHeader: false },
+  'gold-history': { tabId: 'gold', title: '历史金价', showSummary: false, showHeader: false },
+  volume: { tabId: 'seven_A', title: '成交量趋势', showSummary: false, showHeader: false },
+  timing: { tabId: 'A', title: '上证分时', showSummary: false, showHeader: false },
+  funds: { tabId: 'fund', title: '自选基金', showSummary: true, showHeader: true },
+  sectors: { tabId: 'bk', title: '行业板块', showSummary: false, showHeader: false },
+  query: { tabId: 'select_fund', title: '板块基金查询', showSummary: false, showHeader: false }
 };
 
 const CUSTOM_SECTION_KEYS = {
@@ -19,17 +19,7 @@ const CUSTOM_SECTION_KEYS = {
 
 const DEFAULT_SECTION = 'funds';
 const SECTION_QUERY_KEY = 'section';
-const SECTION_NAV_ACCENTS = {
-  news: ['#6d90ff', '#4f66e8'],
-  indices: ['#4b8fff', '#3468f1'],
-  'gold-realtime': ['#1dc8aa', '#0fa281'],
-  'gold-history': ['#aa7dff', '#835ee4'],
-  volume: ['#ffad4f', '#ff842d'],
-  timing: ['#23bcff', '#0f8ed0'],
-  funds: ['#2a86f2', '#1b6fdb'],
-  sectors: ['#2fcd6a', '#14a273'],
-  query: ['#ffbd4d', '#ff9231']
-};
+const NAV_ACTIVE_ACCENT = ['#ECEFF3', '#E3E8EE'];
 const loadedTabs = new Set();
 const pendingLoads = new Map();
 const chartInstances = {
@@ -64,13 +54,13 @@ function getTopNavIndicatorElement() {
   return document.getElementById('topNavActiveIndicator');
 }
 
-function updateTopNavAccent(sectionKey) {
+function updateTopNavAccent() {
   const navScroll = getTopNavScrollElement();
   if (!navScroll) {
     return;
   }
 
-  const [accentStart, accentEnd] = SECTION_NAV_ACCENTS[sectionKey] || SECTION_NAV_ACCENTS[DEFAULT_SECTION];
+  const [accentStart, accentEnd] = NAV_ACTIVE_ACCENT;
   navScroll.style.setProperty('--nav-accent-start', accentStart);
   navScroll.style.setProperty('--nav-accent-end', accentEnd);
 }
@@ -107,7 +97,7 @@ function updateTopNavIndicator(sectionKey, immediate = false) {
     return;
   }
 
-  updateTopNavAccent(sectionKey);
+  updateTopNavAccent();
 
   const targetLeft = activeButton.offsetLeft;
   const targetWidth = activeButton.offsetWidth;
@@ -630,11 +620,6 @@ async function loadFundsSection(targetElement, force = false) {
         </div>
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-card-title">估值走势</h3>
-          </div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-card-header">
             <h3 class="chart-card-title" id="fundTrendTitle">基金估值走势</h3>
             ${chartHeaderRight}
           </div>
@@ -861,6 +846,11 @@ async function navigateToSection(sectionKey, force = false) {
   const sectionTitle = document.getElementById('sectionTitle');
   if (sectionTitle) {
     sectionTitle.textContent = sectionConfig.title;
+  }
+
+  const contentHeader = document.querySelector('.content-header');
+  if (contentHeader) {
+    contentHeader.style.display = sectionConfig.showHeader ? 'flex' : 'none';
   }
 
   const summaryBar = document.getElementById('summaryBar');
