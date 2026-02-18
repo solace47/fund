@@ -10,16 +10,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-brand">LanFund 懒基金助手</div>
-        <div class="navbar-menu">
-            <span class="navbar-item">实时行情</span>
-            {% if username %}
-            <span class="navbar-item" style="color: #667eea;">🍎 {{ username }}</span>
-            <a href="/logout" class="navbar-item" style="color: #f85149; text-decoration: none;">退出登录</a>
-            {% endif %}
-        </div>
-    </nav>
 
     <div class="app-container">
         <div class="main-content">

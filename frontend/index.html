@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LanFund</title>
+  <link rel="icon" href="/static/1.ico" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+  <div class="app-container-sidebar app-layout-topnav">
+    <main class="main-content-area">
+      <nav class="top-nav-shell" aria-label="主导航">
+        <div class="top-nav-scroll" id="topNavScroll">
+          <span class="top-nav-active-indicator" id="topNavActiveIndicator" aria-hidden="true"></span>
+          <button class="sidebar-icon nav-pill" data-section="news" data-tab-id="kx">
+            <span class="icon-label">
+              <span class="label-main">快讯</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="indices" data-tab-id="marker">
+            <span class="icon-label">
+              <span class="label-main">指数</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="gold-realtime" data-tab-id="real_time_gold">
+            <span class="icon-label">
+              <span class="label-main">贵金属</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="gold-history" data-tab-id="gold">
+            <span class="icon-label">
+              <span class="label-main">金价</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="volume" data-tab-id="seven_A">
+            <span class="icon-label">
+              <span class="label-main">成交量</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="timing" data-tab-id="A">
+            <span class="icon-label">
+              <span class="label-main">分时</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill active" data-section="funds" data-tab-id="fund">
+            <span class="icon-label">
+              <span class="label-main">基金</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="sectors" data-tab-id="bk">
+            <span class="icon-label">
+              <span class="label-main">板块</span>
+            </span>
+          </button>
+          <button class="sidebar-icon nav-pill" data-section="query" data-tab-id="select_fund">
+            <span class="icon-label">
+              <span class="label-main">板块基金查询</span>
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      <header class="content-header">
+        <div class="header-left">
+          <h1 class="section-title" id="sectionTitle">自选基金</h1>
+          <span class="market-status">
+            <span class="status-dot"></span>
+            <span id="marketStatusText">市场开盘中</span>
+          </span>
+        </div>
+        <div class="header-right">
+          <span class="last-update" id="lastUpdate">更新于 --:--:--</span>
+        </div>
+      </header>
+
+      <section class="summary-bar" id="summaryBar">
+        <div class="summary-card">
+          <div class="summary-label">总持仓</div>
+          <div class="summary-value" id="summaryTotalValue">0.00</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">今日预估</div>
+          <div class="summary-value" id="summaryEstGain">0.00</div>
+          <div class="summary-change neutral" id="summaryEstChange">+0.00%</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">已结算</div>
+          <div class="summary-value" id="summaryActualGain">0.00</div>
+          <div class="summary-change neutral" id="summaryActualChange">+0.00%</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">今日实际涨跌</div>
+          <div class="summary-value" id="summaryRealGain">净值未更新</div>
+          <div class="summary-change neutral" id="summaryRealChange">--</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">持仓数量</div>
+          <div class="summary-value" id="summaryHoldCount">0 只</div>
+          <div class="summary-change neutral">已标记</div>
+        </div>
+      </section>
+
+      <div class="content-body" id="contentBody">
+        <section class="content-section" id="fundSection">
+          <div class="section-content" id="fundContent"></div>
+        </section>
+
+        <section class="content-section hidden" id="kxSection">
+          <div class="section-content" id="kxContent"></div>
+        </section>
+        <section class="content-section hidden" id="markerSection">
+          <div class="section-content" id="markerContent"></div>
+        </section>
+        <section class="content-section hidden" id="real_time_goldSection">
+          <div class="section-content" id="real_time_goldContent"></div>
+        </section>
+        <section class="content-section hidden" id="goldSection">
+          <div class="section-content" id="goldContent"></div>
+        </section>
+        <section class="content-section hidden" id="seven_ASection">
+          <div class="section-content" id="seven_AContent"></div>
+        </section>
+        <section class="content-section hidden" id="ASection">
+          <div class="section-content" id="AContent"></div>
+        </section>
+        <section class="content-section hidden" id="bkSection">
+          <div class="section-content" id="bkContent"></div>
+        </section>
+        <section class="content-section hidden" id="select_fundSection">
+          <div class="section-content" id="select_fundContent"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="sector-modal" id="sectorModal">
+    <div class="sector-modal-content">
+      <div class="sector-modal-header">选择板块</div>
+      <input type="text" class="sector-modal-search" id="sectorSearch" placeholder="搜索板块名称..." />
+      <div id="sectorCategories"></div>
+      <div class="sector-modal-footer">
+        <button class="btn btn-secondary" onclick="closeSectorModal()">取消</button>
+        <button class="btn btn-primary" onclick="confirmSector()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sector-modal" id="fundSelectionModal">
+    <div class="sector-modal-content">
+      <div class="sector-modal-header" id="fundSelectionTitle">选择基金</div>
+      <input type="text" class="sector-modal-search" id="fundSelectionSearch" placeholder="搜索基金代码或名称..." />
+      <div id="fundSelectionList" style="max-height: 400px; overflow-y: auto;"></div>
+      <div class="sector-modal-footer">
+        <button class="btn btn-secondary" onclick="closeFundSelectionModal()">取消</button>
+        <button class="btn btn-primary" id="fundSelectionConfirmBtn" onclick="confirmFundSelection()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-dialog" id="confirmDialog">
+    <div class="confirm-dialog-content">
+      <h3 id="confirmTitle" class="confirm-title"></h3>
+      <p id="confirmMessage" class="confirm-message"></p>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary" onclick="closeConfirmDialog()">取消</button>
+        <button class="btn btn-primary" id="confirmBtn">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sector-modal" id="sharesModal">
+    <div class="sector-modal-content" style="max-width: 460px;">
+      <div class="sector-modal-header">修改持仓</div>
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">最新净值（日期）</label>
+          <div id="sharesModalNetInfo"
+            style="padding: 10px; background: rgba(30, 41, 59, 0.45); border-radius: 6px; color: var(--text-main);">--
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+          <button id="sharesModalModeBtn" class="btn btn-secondary" onclick="toggleHoldingInputMode()">转换为份额输入</button>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label for="sharesModalAmountInput"
+            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有金额</label>
+          <input type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额"
+            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label for="sharesModalInput"
+            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持仓份额</label>
+          <input type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额"
+            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label for="sharesModalProfitInput"
+            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有收益</label>
+          <input type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益"
+            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label for="sharesModalDaysInput"
+            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有天数</label>
+          <input type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数"
+            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        </div>
+        <div id="sharesModalSharesPreview"
+          style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+          换算份额：0.00 份 | 当前持仓市值：0.00
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: var(--text-dim);">
+          说明：金额和份额会按当前净值双向换算，保存时以份额为准。
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px;">
+          <button class="btn btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.35);"
+            onclick="openHoldingSyncAction('buy')">同步加仓</button>
+          <button class="btn btn-secondary" style="color: #10b981; border-color: rgba(16,185,129,0.35);"
+            onclick="openHoldingSyncAction('sell')">同步减仓</button>
+          <button class="btn btn-secondary" style="color: #3b82f6; border-color: rgba(59,130,246,0.35);"
+            onclick="openHoldingSyncAction('dca')">同步定投</button>
+          <button class="btn btn-secondary" style="color: #6366f1; border-color: rgba(99,102,241,0.35);"
+            onclick="openHoldingSyncAction('convert')">同步转换</button>
+        </div>
+      </div>
+      <div class="sector-modal-footer">
+        <button class="btn btn-secondary" onclick="closeSharesModal()">取消</button>
+        <button class="btn btn-primary" onclick="confirmShares()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

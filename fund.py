@@ -2,7 +2,6 @@
 
 import argparse
 import datetime
-import getpass
 import json
 import os
 import random
@@ -68,13 +67,11 @@ class ClientConfig:
             return None
 
     @classmethod
-    def save_config(cls, server_url, username, password):
+    def save_config(cls, server_url):
         """保存配置"""
         try:
             config = {
                 'server_url': server_url.rstrip('/'),
-                'username': username,
-                'password': password,
                 'last_sync': None
             }
             os.makedirs("cache", exist_ok=True)
@@ -87,12 +84,12 @@ class ClientConfig:
             return False
 
     @classmethod
-    def verify_server_connection(cls, server_url, username, password):
+    def verify_server_connection(cls, server_url):
         """验证服务器连接"""
         try:
             response = requests.post(
                 f"{server_url}/api/client/fund/config",
-                json={'username': username, 'password': password, 'action': 'get'},
+                json={'action': 'get'},
                 timeout=10
             )
             if response.status_code == 200:
@@ -101,7 +98,7 @@ class ClientConfig:
                     logger.info("服务器连接验证成功")
                     return True
                 else:
-                    logger.error(f"认证失败: {data.get('message')}")
+                    logger.error(f"接口验证失败: {data.get('message')}")
             else:
                 logger.error(f"服务器返回错误: {response.status_code}")
         except requests.exceptions.ConnectionError:
@@ -120,23 +117,14 @@ class ClientConfig:
         if not server_url:
             server_url = "http://localhost:8311"
         server_url = server_url.rstrip("/")
-        username = input("请输入用户名: ").strip()
-        if not username:
-            logger.error("用户名不能为空")
-            return False
-
-        password = getpass.getpass("请输入密码: ")
-        if not password:
-            logger.error("密码不能为空")
-            return False
 
         logger.info("正在验证服务器连接...")
-        if not cls.verify_server_connection(server_url, username, password):
+        if not cls.verify_server_connection(server_url):
             logger.error("服务器连接验证失败，请检查配置")
             return False
 
         logger.info("连接验证成功，正在保存配置...")
-        if cls.save_config(server_url, username, password):
+        if cls.save_config(server_url):
             logger.info("配置初始化完成！")
             return True
         return False
@@ -251,11 +239,7 @@ class LanFund:
         try:
             response = requests.post(
                 f"{config['server_url']}/api/client/fund/config",
-                json={
-                    'username': config['username'],
-                    'password': config['password'],
-                    'action': 'get'
-                },
+                json={'action': 'get'},
                 timeout=10
             )
 
@@ -288,8 +272,6 @@ class LanFund:
             response = requests.post(
                 f"{config['server_url']}/api/client/fund/config",
                 json={
-                    'username': config['username'],
-                    'password': config['password'],
                     'action': 'push',
                     'fund_map': self.CACHE_MAP
                 },
@@ -633,14 +615,14 @@ class LanFund:
                             dayOfGrowth = "\033[1;31m" + dayOfGrowth
                     # 处理持有标记（Web 和 CLI 模式都显示）
                     if self.CACHE_MAP[fund].get("is_hold", False):
-                        fund_name = "⭐ " + fund_name
+                        fund_name = ("持有 " if is_return else "[持有] ") + fund_name
                     # 处理板块标记 - 根据模式使用不同格式
                     sectors = self.CACHE_MAP[fund].get("sectors", [])
                     if sectors:
                         sector_display = ", ".join(sectors)
                         if is_return:
                             # Web模式：使用HTML样式
-                            fund_name = f"{fund_name} <span style='color: #8b949e; font-size: 12px;'>🏷️ {sector_display}</span>"
+                            fund_name = f"{fund_name} <span style='color: #8b949e; font-size: 12px;'>板块: {sector_display}</span>"
                         else:
                             # CLI模式：使用括号格式
                             fund_name = f"({sector_display}) {fund_name}"
@@ -649,7 +631,7 @@ class LanFund:
                     # 合并近30天涨跌和总涨幅
                     monthly_info = f"{montly_growth_day}/{montly_growth_day_count} {montly_growth_rate}"
                     self.result.append([
-                        fund, fund_name, now_time, netValue, forecastGrowth, dayOfGrowth, consecutive_info, monthly_info
+                        fund, fund_name, netValue, forecastGrowth, dayOfGrowth, consecutive_info, monthly_info
                     ])
                 else:
                     logger.error(f"查询基金代码【{fund}】失败: {response.text.strip()}")
@@ -752,7 +734,7 @@ class LanFund:
         if is_return:
             self.result = sorted(
                 self.result,
-                key=lambda x: float(x[4].replace("%", "")) if x[4] != "N/A" else -99,
+                key=lambda x: float(x[3].replace("%", "")) if x[3] != "N/A" else -99,
                 reverse=True
             )
             return self.result
@@ -760,7 +742,7 @@ class LanFund:
         if self.result:
             self.result = sorted(
                 self.result,
-                key=lambda x: float(x[4].split("m")[1].replace("%", "")) if x[4] != "N/A" else -99,
+                key=lambda x: float(x[3].split("m")[1].replace("%", "")) if x[3] != "N/A" else -99,
                 reverse=True
             )
 
@@ -829,11 +811,11 @@ class LanFund:
                         logger.info(line_msg)
 
             # CLI模式删除净值列，避免表格过宽
-            cli_result = [[row[0], row[1], row[2], row[4], row[5], row[6], row[7]] for row in self.result]
+            cli_result = [[row[0], row[1], row[3], row[4], row[5], row[6]] for row in self.result]
             logger.critical(f"{time.strftime('%Y-%m-%d %H:%M')} 基金估值信息:")
             for line_msg in format_table_msg([
                 [
-                    "基金代码", "基金名称", "时间", "估值", "日涨幅", "连涨/跌", "近30天"
+                    "基金代码", "基金名称", "估值", "日涨幅", "连涨/跌", "近30天"
                 ],
                 *cli_result
             ]).split("\n"):
@@ -871,7 +853,7 @@ class LanFund:
                 fund_name = fund_data[1]
 
                 # 解析净值 "1.234(2025-02-02)" or "1.234(02-03)"
-                net_value_str = fund_data[3]
+                net_value_str = fund_data[2]
                 net_value = float(net_value_str.split('(')[0])
                 net_value_date = net_value_str.split('(')[1].replace(')', '')
 
@@ -882,7 +864,7 @@ class LanFund:
                     net_value_date = f"{current_year}-{net_value_date}"
 
                 # 解析估值增长率 "+1.23%" or "N/A"
-                estimated_growth_str = fund_data[4]
+                estimated_growth_str = fund_data[3]
                 if estimated_growth_str != "N/A":
                     # 移除ANSI颜色代码
                     estimated_growth_str = estimated_growth_str.replace('\033[1;31m', '').replace('\033[1;32m',
@@ -892,7 +874,7 @@ class LanFund:
                     estimated_growth = 0
 
                 # 解析日涨幅 "+1.23%" or "N/A"
-                day_growth_str = fund_data[5]
+                day_growth_str = fund_data[4]
                 if day_growth_str != "N/A":
                     # 移除ANSI颜色代码
                     day_growth_str = day_growth_str.replace('\033[1;31m', '').replace('\033[1;32m', '').replace('%', '')
@@ -1008,10 +990,10 @@ class LanFund:
         result = self.search_code(True)
         return get_table_html(
             [
-                "基金代码", "基金名称", "当前时间", "净值", "估值", "日涨幅", "连涨/跌", "近30天"
+                "基金代码", "基金名称", "净值", "估值", "日涨幅", "连涨/跌", "近30天"
             ],
             result,
-            sortable_columns=[4, 5, 6, 7]
+            sortable_columns=[3, 4, 5, 6]
         )
 
     @staticmethod
