@@ -1603,8 +1603,18 @@ document.addEventListener('DOMContentLoaded', function () {
     let refreshInterval;
     const REFRESH_INTERVAL = 60000; // 60 seconds
 
+    function isManagedAppRefresh() {
+        const path = window.location.pathname;
+        const isAppPath = path === '/' || path === '/app' || path === '/app/';
+        return isAppPath && window.__lanfundManagedRefresh === true;
+    }
+
     // Start auto-refresh
     function startAutoRefresh() {
+        if (isManagedAppRefresh()) {
+            // /app page is refreshed by frontend/src/main.js with per-section strategy.
+            return;
+        }
         if (refreshInterval) {
             clearInterval(refreshInterval);
         }
@@ -1640,7 +1650,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 case '/app':
                 case '/app/':
                     if (typeof window.lanfundRefreshCurrentSection === 'function') {
-                        await window.lanfundRefreshCurrentSection();
+                        await window.lanfundRefreshCurrentSection({
+                            forceFull: false,
+                            reason: 'legacy-refresh'
+                        });
                     } else {
                         await fetchPortfolioData();
                     }
@@ -1948,6 +1961,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Page visibility detection - pause refresh when tab is hidden
     document.addEventListener('visibilitychange', function () {
+        if (isManagedAppRefresh()) {
+            return;
+        }
         if (document.hidden) {
             stopAutoRefresh();
         } else {

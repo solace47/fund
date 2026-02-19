@@ -4,6 +4,8 @@ os.makedirs("cache", exist_ok=True)
 
 import importlib
 import json
+import threading
+import time
 from pathlib import Path
 
 import urllib3
@@ -41,6 +43,88 @@ db = Database()  # 初始化数据库
 LOCAL_USER_ID = int(os.getenv("LANFUND_LOCAL_USER_ID", "1"))
 LOCAL_USERNAME = os.getenv("LANFUND_LOCAL_USERNAME", "").strip() or None
 FRONTEND_DIST_DIR = Path(__file__).resolve().parent / "frontend" / "dist"
+_CACHE_MISS = object()
+_READ_CACHE = {}
+_READ_CACHE_LOCK = threading.Lock()
+_CACHE_KEY_LOCKS = {}
+_CACHE_KEY_LOCKS_GUARD = threading.Lock()
+
+TAB_CACHE_TTLS = {
+    'A': 4.0,
+    'kx': 8.0,
+    'real_time_gold': 10.0,
+    'fund': 10.0,
+    'marker': 20.0,
+    'seven_A': 25.0,
+    'gold': 30.0,
+    'bk': 30.0,
+    'select_fund': 120.0,
+}
+
+API_CACHE_TTLS = {
+    'timing': 4.0,
+    'news_7x24': 8.0,
+    'indices_global': 20.0,
+    'indices_volume': 25.0,
+    'gold_realtime': 10.0,
+    'gold_history': 30.0,
+    'gold_one_day': 10.0,
+    'sectors': 30.0,
+    'fund_chart': 8.0,
+}
+
+
+def _get_cache_key_lock(cache_key):
+    with _CACHE_KEY_LOCKS_GUARD:
+        lock = _CACHE_KEY_LOCKS.get(cache_key)
+        if lock is None:
+            lock = threading.Lock()
+            _CACHE_KEY_LOCKS[cache_key] = lock
+        return lock
+
+
+def _cache_get(cache_key):
+    now = time.monotonic()
+    with _READ_CACHE_LOCK:
+        entry = _READ_CACHE.get(cache_key)
+        if entry is None:
+            return _CACHE_MISS
+        if entry['expire_at'] <= now:
+            _READ_CACHE.pop(cache_key, None)
+            return _CACHE_MISS
+        return entry['value']
+
+
+def _cache_set(cache_key, value, ttl_seconds):
+    if ttl_seconds <= 0:
+        return
+    with _READ_CACHE_LOCK:
+        _READ_CACHE[cache_key] = {
+            'expire_at': time.monotonic() + ttl_seconds,
+            'value': value,
+        }
+
+
+def get_or_build_cached(cache_key, ttl_seconds, builder):
+    cached = _cache_get(cache_key)
+    if cached is not _CACHE_MISS:
+        return cached
+
+    cache_lock = _get_cache_key_lock(cache_key)
+    with cache_lock:
+        cached = _cache_get(cache_key)
+        if cached is not _CACHE_MISS:
+            return cached
+        value = builder()
+        _cache_set(cache_key, value, ttl_seconds)
+        return value
+
+
+def invalidate_runtime_cache():
+    with _READ_CACHE_LOCK:
+        _READ_CACHE.clear()
+    with _CACHE_KEY_LOCKS_GUARD:
+        _CACHE_KEY_LOCKS.clear()
 
 
 def get_current_user_id():
@@ -100,6 +184,7 @@ def api_fund_add():
         importlib.reload(fund)
         my_fund = fund.LanFund(user_id=user_id, db=db)
         my_fund.add_code(codes)
+        invalidate_runtime_cache()
         return {'success': True, 'message': f'已添加基金: {codes}'}
     except Exception as e:
         logger.error(f"添加基金失败: {e}")
@@ -118,6 +203,7 @@ def api_fund_delete():
         importlib.reload(fund)
         my_fund = fund.LanFund(user_id=user_id, db=db)
         my_fund.delete_code(codes)
+        invalidate_runtime_cache()
         return {'success': True, 'message': f'已删除基金: {codes}'}
     except Exception as e:
         logger.error(f"删除基金失败: {e}")
@@ -141,6 +227,7 @@ def api_fund_hold():
             if code in my_fund.CACHE_MAP:
                 my_fund.CACHE_MAP[code]['is_hold'] = hold
         my_fund.save_cache()
+        invalidate_runtime_cache()
         action = '标记持有' if hold else '取消持有'
         return {'success': True, 'message': f'已{action}: {codes}'}
     except Exception as e:
@@ -163,6 +250,7 @@ def api_fund_sector():
         code_list = [c.strip() for c in codes.split(',')]
         # 使用Web专用方法
         my_fund.mark_fund_sector_web(code_list, sectors)
+        invalidate_runtime_cache()
         return {'success': True, 'message': f'已标注板块: {codes} -> {", ".join(sectors)}'}
     except Exception as e:
         logger.error(f"标注板块失败: {e}")
@@ -181,6 +269,7 @@ def api_fund_sector_remove():
         code_list = [c.strip() for c in codes.split(',')]
         # 使用Web专用方法
         my_fund.unmark_fund_sector_web(code_list)
+        invalidate_runtime_cache()
         return {'success': True, 'message': f'已删除板块标记: {codes}'}
     except Exception as e:
         logger.error(f"删除板块标记失败: {e}")
@@ -212,6 +301,7 @@ def api_fund_upload():
         user_id = get_current_user_id()
         success = db.save_user_funds(user_id, fund_map)
         if success:
+            invalidate_runtime_cache()
             return {'success': True, 'message': f'成功导入{len(fund_map)}个基金'}
         else:
             return {'success': False, 'message': '保存失败'}
@@ -266,6 +356,7 @@ def api_fund_shares():
                     fund_map[code]['is_hold'] = True
                     fund_map[code]['shares'] = shares
                     db.save_user_funds(user_id, fund_map)
+            invalidate_runtime_cache()
             return {'success': True, 'message': f'已更新份额: {shares}'}
         else:
             return {'success': False, 'message': '更新失败，基金不存在'}
@@ -299,6 +390,7 @@ def api_client_fund_config():
             if not isinstance(fund_map, dict):
                 return jsonify({'success': False, 'message': '配置格式错误'}), 400
             if db.save_user_funds(user_id, fund_map):
+                invalidate_runtime_cache()
                 return jsonify({'success': True, 'message': '配置已同步'})
             else:
                 return jsonify({'success': False, 'message': '保存失败'}), 500
@@ -311,30 +403,34 @@ def api_get_tab_data(tab_id):
     """按需加载单个tab的数据"""
     try:
         user_id = get_current_user_id()
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=user_id, db=db)
-        # 定义tab ID到函数的映射
-        tab_functions = {
-            'kx': my_fund.kx_html,
-            'marker': my_fund.marker_html,
-            'real_time_gold': my_fund.real_time_gold_html,
-            'gold': my_fund.gold_html,
-            'seven_A': my_fund.seven_A_html,
-            'A': my_fund.A_html,
-            'fund': my_fund.fund_html,
-            'bk': my_fund.bk_html,
-            'select_fund': my_fund.select_fund_html,
-        }
-        if tab_id not in tab_functions:
+        cache_ttl = TAB_CACHE_TTLS.get(tab_id)
+        if cache_ttl is None:
             return jsonify({'success': False, 'message': f'未知的tab ID: {tab_id}'}), 404
-        # 获取数据
-        content = tab_functions[tab_id]()
-        # 如果是fund tab，需要增强内容（传递份额数据）
-        if tab_id == 'fund':
-            user_id = get_current_user_id()
-            fund_map = db.get_user_funds(user_id)
-            shares_map = {code: data.get('shares', 0) for code, data in fund_map.items()}
-            content = enhance_fund_tab_content(content, shares_map)
+
+        cache_key = f"tab:{user_id}:{tab_id}"
+
+        def build_tab_content():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            tab_functions = {
+                'kx': my_fund.kx_html,
+                'marker': my_fund.marker_html,
+                'real_time_gold': my_fund.real_time_gold_html,
+                'gold': my_fund.gold_html,
+                'seven_A': my_fund.seven_A_html,
+                'A': my_fund.A_html,
+                'fund': my_fund.fund_html,
+                'bk': my_fund.bk_html,
+                'select_fund': my_fund.select_fund_html,
+            }
+            content = tab_functions[tab_id]()
+            if tab_id == 'fund':
+                fund_map = db.get_user_funds(user_id)
+                shares_map = {code: data.get('shares', 0) for code, data in fund_map.items()}
+                content = enhance_fund_tab_content(content, shares_map)
+            return content
+
+        content = get_or_build_cached(cache_key, cache_ttl, build_tab_content)
         return jsonify({'success': True, 'content': content})
     except Exception as e:
         logger.error(f"加载tab {tab_id} 数据失败: {e}")
@@ -345,15 +441,19 @@ def api_timing_data():
     """获取上证分时数据"""
     try:
         user_id = get_current_user_id()
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=user_id, db=db)
-        # 使用现有的 get_timing_chart_data 方法
-        data = my_fund.get_timing_chart_data()
-        # 添加当前价格和涨跌幅信息（使用原始数据中的正确涨跌幅）
-        if data['prices']:
-            data['current_price'] = data['prices'][-1]
-            data['change'] = data['change_amounts'][-1] if data.get('change_amounts') else 0
-            data['change_pct'] = data['change_pcts'][-1] if data.get('change_pcts') else 0
+        cache_key = f"api:timing:{user_id}"
+
+        def build_timing_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            data = my_fund.get_timing_chart_data()
+            if data['prices']:
+                data['current_price'] = data['prices'][-1]
+                data['change'] = data['change_amounts'][-1] if data.get('change_amounts') else 0
+                data['change_pct'] = data['change_pcts'][-1] if data.get('change_pcts') else 0
+            return data
+
+        data = get_or_build_cached(cache_key, API_CACHE_TTLS['timing'], build_timing_data)
         return jsonify({'success': True, 'data': data})
     except Exception as e:
         logger.error(f"获取上证分时数据失败: {e}")
@@ -362,41 +462,41 @@ def api_timing_data():
 def api_news_7x24():
     """获取7*24快讯"""
     try:
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=get_current_user_id(), db=db)
-        # 获取快讯数据
-        result = my_fund.kx(True)
-        # 将数据转换为JSON格式
-        # kx() 返回的是 list of dicts，需要正确提取字段
-        news_items = []
-        if result:
-            for item in result:
-                try:
-                    # 提取标题和内容
-                    title = item.get('title', '')
-                    if not title and 'content' in item and 'items' in item['content']:
-                        content_items = item['content'].get('items', [])
-                        if content_items and len(content_items) > 0:
-                            title = content_items[0].get('data', '')
-                    # 提取发布时间
-                    publish_time = item.get('publish_time', '')
-                    if publish_time:
-                        # 转换时间戳为可读格式
-                        import datetime
-                        try:
-                            publish_time = datetime.datetime.fromtimestamp(int(publish_time)).strftime("%H:%M:%S")
-                        except:
-                            publish_time = ''
-                    # 提取评估（利好/利空）
-                    evaluate = item.get('evaluate', '')
-                    news_items.append({
-                        'time': publish_time,
-                        'content': title,
-                        'source': evaluate if evaluate else ''
-                    })
-                except Exception as e:
-                    logger.debug(f"Error processing news item: {e}")
-                    continue
+        user_id = get_current_user_id()
+        cache_key = f"api:news_7x24:{user_id}"
+
+        def build_news_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            result = my_fund.kx(True)
+            news_items = []
+            if result:
+                for item in result:
+                    try:
+                        title = item.get('title', '')
+                        if not title and 'content' in item and 'items' in item['content']:
+                            content_items = item['content'].get('items', [])
+                            if content_items and len(content_items) > 0:
+                                title = content_items[0].get('data', '')
+                        publish_time = item.get('publish_time', '')
+                        if publish_time:
+                            import datetime
+                            try:
+                                publish_time = datetime.datetime.fromtimestamp(int(publish_time)).strftime("%H:%M:%S")
+                            except Exception:
+                                publish_time = ''
+                        evaluate = item.get('evaluate', '')
+                        news_items.append({
+                            'time': publish_time,
+                            'content': title,
+                            'source': evaluate if evaluate else ''
+                        })
+                    except Exception as err:
+                        logger.debug(f"Error processing news item: {err}")
+                        continue
+            return news_items
+
+        news_items = get_or_build_cached(cache_key, API_CACHE_TTLS['news_7x24'], build_news_data)
         return jsonify({'success': True, 'data': news_items})
     except Exception as e:
         logger.error(f"获取7*24快讯失败: {e}")
@@ -405,26 +505,29 @@ def api_news_7x24():
 def api_indices_global():
     """获取全球指数数据"""
     try:
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=get_current_user_id(), db=db)
-        # 获取全球指数数据 - 使用正确的方法名
-        result = my_fund.get_market_info(True)
-        # 将数据转换为JSON格式
-        # result 格式: [[名称, 指数, 涨跌幅], ...]
-        indices = []
-        if result:
-            for item in result:
-                if len(item) >= 3:
-                    # 清理涨跌幅中的颜色代码和%符号
-                    change_str = item[2] if item[2] else "0%"
-                    change_str = change_str.replace('%', '').replace('\033[1;31m', '').replace('\033[1;32m', '')
-                    change = float(change_str) if change_str else 0
-                    indices.append({
-                        'name': item[0],
-                        'value': item[1],
-                        'change': change_str + '%',
-                        'change_pct': change
-                    })
+        user_id = get_current_user_id()
+        cache_key = f"api:indices_global:{user_id}"
+
+        def build_indices_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            result = my_fund.get_market_info(True)
+            indices = []
+            if result:
+                for item in result:
+                    if len(item) >= 3:
+                        change_str = item[2] if item[2] else "0%"
+                        change_str = change_str.replace('%', '').replace('\033[1;31m', '').replace('\033[1;32m', '')
+                        change = float(change_str) if change_str else 0
+                        indices.append({
+                            'name': item[0],
+                            'value': item[1],
+                            'change': change_str + '%',
+                            'change_pct': change
+                        })
+            return indices
+
+        indices = get_or_build_cached(cache_key, API_CACHE_TTLS['indices_global'], build_indices_data)
         return jsonify({'success': True, 'data': indices})
     except Exception as e:
         logger.error(f"获取全球指数失败: {e}")
@@ -433,10 +536,15 @@ def api_indices_global():
 def api_indices_volume():
     """获取成交量趋势数据"""
     try:
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=get_current_user_id(), db=db)
-        # 使用现有的 get_volume_chart_data 方法
-        data = my_fund.get_volume_chart_data()
+        user_id = get_current_user_id()
+        cache_key = f"api:indices_volume:{user_id}"
+
+        def build_volume_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            return my_fund.get_volume_chart_data()
+
+        data = get_or_build_cached(cache_key, API_CACHE_TTLS['indices_volume'], build_volume_data)
         return jsonify({'success': True, 'data': data})
     except Exception as e:
         logger.error(f"获取成交量趋势失败: {e}")
@@ -445,31 +553,33 @@ def api_indices_volume():
 def api_gold_realtime():
     """获取实时贵金属价格"""
     try:
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=get_current_user_id(), db=db)
-        # 获取实时金价数据
-        # real_time_gold 返回 [[...], [...], [...]] 三个贵金属的数据
-        # 每个数组有10列: [名称, 最新价, 涨跌额, 涨跌幅, 开盘价, 最高价, 最低价, 昨收价, 更新时间, 单位]
-        result = my_fund.real_time_gold(True)
-        # 将数据转换为JSON格式，保留所有10列
-        gold_data = []
-        gold_names = ['中国黄金', '周大福', '周生生']  # 根据API代码 JO_71, JO_92233, JO_92232
-        if result and len(result) >= 3:
-            # result[0], result[1], result[2] 分别是三种贵金属的数据
-            for i, gold_type_data in enumerate(result):
-                if len(gold_type_data) >= 4:  # 至少需要前4列
-                    gold_data.append({
-                        'name': gold_type_data[0] if gold_type_data else gold_names[i],
-                        'price': gold_type_data[1] if len(gold_type_data) > 1 else '',
-                        'change_amount': gold_type_data[2] if len(gold_type_data) > 2 else '',
-                        'change_pct': gold_type_data[3] if len(gold_type_data) > 3 else '',
-                        'open_price': gold_type_data[4] if len(gold_type_data) > 4 else '',
-                        'high_price': gold_type_data[5] if len(gold_type_data) > 5 else '',
-                        'low_price': gold_type_data[6] if len(gold_type_data) > 6 else '',
-                        'prev_close': gold_type_data[7] if len(gold_type_data) > 7 else '',
-                        'update_time': gold_type_data[8] if len(gold_type_data) > 8 else '',
-                        'unit': gold_type_data[9] if len(gold_type_data) > 9 else ''
-                    })
+        user_id = get_current_user_id()
+        cache_key = f"api:gold_realtime:{user_id}"
+
+        def build_gold_realtime_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            result = my_fund.real_time_gold(True)
+            gold_data = []
+            gold_names = ['中国黄金', '周大福', '周生生']
+            if result and len(result) >= 3:
+                for i, gold_type_data in enumerate(result):
+                    if len(gold_type_data) >= 4:
+                        gold_data.append({
+                            'name': gold_type_data[0] if gold_type_data else gold_names[i],
+                            'price': gold_type_data[1] if len(gold_type_data) > 1 else '',
+                            'change_amount': gold_type_data[2] if len(gold_type_data) > 2 else '',
+                            'change_pct': gold_type_data[3] if len(gold_type_data) > 3 else '',
+                            'open_price': gold_type_data[4] if len(gold_type_data) > 4 else '',
+                            'high_price': gold_type_data[5] if len(gold_type_data) > 5 else '',
+                            'low_price': gold_type_data[6] if len(gold_type_data) > 6 else '',
+                            'prev_close': gold_type_data[7] if len(gold_type_data) > 7 else '',
+                            'update_time': gold_type_data[8] if len(gold_type_data) > 8 else '',
+                            'unit': gold_type_data[9] if len(gold_type_data) > 9 else ''
+                        })
+            return gold_data
+
+        gold_data = get_or_build_cached(cache_key, API_CACHE_TTLS['gold_realtime'], build_gold_realtime_data)
         return jsonify({'success': True, 'data': gold_data})
     except Exception as e:
         logger.error(f"获取实时金价失败: {e}")
@@ -478,22 +588,27 @@ def api_gold_realtime():
 def api_gold_history():
     """获取历史金价数据"""
     try:
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=get_current_user_id(), db=db)
-        # 获取历史金价数据 (gold 是静态方法，返回 raw data)
-        result = my_fund.gold(True)
-        # gold 返回格式: [[日期, 中国黄金基础金价, 周大福金价, 中国黄金基础金价涨跌, 周大福金价涨跌], ...]
-        gold_history = []
-        if result:
-            for item in result:
-                if len(item) >= 3:
-                    gold_history.append({
-                        'date': item[0],
-                        'china_gold_price': item[1],
-                        'chow_tai_fook_price': item[2],
-                        'china_gold_change': item[3] if len(item) > 3 else '',
-                        'chow_tai_fook_change': item[4] if len(item) > 4 else ''
-                    })
+        user_id = get_current_user_id()
+        cache_key = f"api:gold_history:{user_id}"
+
+        def build_gold_history_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            result = my_fund.gold(True)
+            gold_history = []
+            if result:
+                for item in result:
+                    if len(item) >= 3:
+                        gold_history.append({
+                            'date': item[0],
+                            'china_gold_price': item[1],
+                            'chow_tai_fook_price': item[2],
+                            'china_gold_change': item[3] if len(item) > 3 else '',
+                            'chow_tai_fook_change': item[4] if len(item) > 4 else ''
+                        })
+            return gold_history
+
+        gold_history = get_or_build_cached(cache_key, API_CACHE_TTLS['gold_history'], build_gold_history_data)
         return jsonify({'success': True, 'data': gold_history})
     except Exception as e:
         logger.error(f"获取历史金价失败: {e}")
@@ -502,11 +617,15 @@ def api_gold_history():
 def api_gold_one_day():
     """获取分时黄金价格数据"""
     try:
-        importlib.reload(fund)
-        my_fund = fund.LanFund(user_id=get_current_user_id(), db=db)
-        # 获取分时黄金数据 (one_day_gold 是静态方法，返回 raw data)
-        result = my_fund.one_day_gold()
-        # one_day_gold 返回格式: [{"date": "2024-01-01 09:30:00", "price": 123.45}, ...]
+        user_id = get_current_user_id()
+        cache_key = f"api:gold_one_day:{user_id}"
+
+        def build_gold_one_day_data():
+            importlib.reload(fund)
+            my_fund = fund.LanFund(user_id=user_id, db=db)
+            return my_fund.one_day_gold()
+
+        result = get_or_build_cached(cache_key, API_CACHE_TTLS['gold_one_day'], build_gold_one_day_data)
         return jsonify({'success': True, 'data': result})
     except Exception as e:
         logger.error(f"获取分时黄金数据失败: {e}")
@@ -515,46 +634,48 @@ def api_gold_one_day():
 def api_sectors():
     """获取行业板块数据"""
     try:
-        importlib.reload(fund)
-        # 获取板块数据 (bk 是静态方法，返回 raw data)
-        # 需要从API获取板块代码
-        import requests
-        url = "https://push2.eastmoney.com/api/qt/clist/get"
-        params = {
-            "cb": "",
-            "fid": "f62",
-            "po": "1",
-            "pz": "100",
-            "pn": "1",
-            "np": "1",
-            "fltt": "2",
-            "invt": "2",
-            "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
-            "fs": "m:90 t:2",
-            "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13"
-        }
-        response = requests.get(url, params=params, timeout=10, verify=False)
-        if str(response.json()["data"]):
+        user_id = get_current_user_id()
+        cache_key = f"api:sectors:{user_id}"
+
+        def build_sector_data():
+            importlib.reload(fund)
+            import requests
+            url = "https://push2.eastmoney.com/api/qt/clist/get"
+            params = {
+                "cb": "",
+                "fid": "f62",
+                "po": "1",
+                "pz": "100",
+                "pn": "1",
+                "np": "1",
+                "fltt": "2",
+                "invt": "2",
+                "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+                "fs": "m:90 t:2",
+                "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13"
+            }
+            response = requests.get(url, params=params, timeout=10, verify=False)
+            if not str(response.json()["data"]):
+                return []
             data = response.json()["data"]
             sectors = []
             for bk in data["diff"]:
                 sectors.append({
-                    'code': bk["f12"],  # 板块代码
-                    'name': bk["f14"],  # 板块名称
-                    'change': str(bk["f3"]) + "%",  # 涨跌幅
-                    'main_inflow': str(round(bk["f62"] / 100000000, 2)) + "亿",  # 主力净流入
-                    'main_inflow_pct': str(round(bk["f184"], 2)) + "%",  # 主力净流入占比
-                    'small_inflow': str(round(bk["f84"] / 100000000, 2)) + "亿",  # 小单净流入
-                    'small_inflow_pct': str(round(bk["f87"], 2)) + "%"  # 小单流入占比
+                    'code': bk["f12"],
+                    'name': bk["f14"],
+                    'change': str(bk["f3"]) + "%",
+                    'main_inflow': str(round(bk["f62"] / 100000000, 2)) + "亿",
+                    'main_inflow_pct': str(round(bk["f184"], 2)) + "%",
+                    'small_inflow': str(round(bk["f84"] / 100000000, 2)) + "亿",
+                    'small_inflow_pct': str(round(bk["f87"], 2)) + "%"
                 })
-            # 按涨跌幅降序排序（与原始 bk() 函数的排序逻辑一致）
-            sectors = sorted(
+            return sorted(
                 sectors,
                 key=lambda x: float(x['change'].replace("%", "")) if x['main_inflow_pct'] != "N/A" else -99,
                 reverse=True
             )
-        else:
-            sectors = []
+
+        sectors = get_or_build_cached(cache_key, API_CACHE_TTLS['sectors'], build_sector_data)
         return jsonify({'success': True, 'data': sectors})
     except Exception as e:
         logger.error(f"获取行业板块失败: {e}")
@@ -632,6 +753,7 @@ def get_portfolio():
     """兼容旧路由并转发到统一前端入口"""
     add = request.args.get("add")
     delete = request.args.get("delete")
+    changed = False
 
     # 兼容历史 URL 参数能力
     if add:
@@ -639,11 +761,15 @@ def get_portfolio():
         importlib.reload(fund)
         my_fund = fund.LanFund(user_id=user_id, db=db)
         my_fund.add_code(add)
+        changed = True
     if delete:
         user_id = get_current_user_id()
         importlib.reload(fund)
         my_fund = fund.LanFund(user_id=user_id, db=db)
         my_fund.delete_code(delete)
+        changed = True
+    if changed:
+        invalidate_runtime_cache()
     return redirect('/app?section=funds')
 @app.route('/api/fund/chart-data')
 def api_fund_chart_data():
@@ -659,9 +785,15 @@ def api_fund_chart_data():
         'fund_key': user_funds[fund_code]['fund_key'],
         'fund_name': user_funds[fund_code]['fund_name']
     }
-    importlib.reload(fund)
-    my_fund = fund.LanFund(user_id=user_id, db=db)
-    chart_data = my_fund.get_fund_chart_data(fund_code, fund_data)
+
+    cache_key = f"api:fund_chart:{user_id}:{fund_code}"
+
+    def build_chart_data():
+        importlib.reload(fund)
+        my_fund = fund.LanFund(user_id=user_id, db=db)
+        return my_fund.get_fund_chart_data(fund_code, fund_data)
+
+    chart_data = get_or_build_cached(cache_key, API_CACHE_TTLS['fund_chart'], build_chart_data)
     return jsonify({
         'chart_data': chart_data,
         'fund_info': {

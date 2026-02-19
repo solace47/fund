@@ -2887,3 +2887,241 @@ body::before {
         font-size: 10px;
     }
 }
+
+/* ============================================================
+   33. Floating Refresh Button
+   ============================================================ */
+.floating-refresh-button {
+    --fab-icon-center-x: 21px;
+    position: fixed;
+    top: 48vh;
+    right: -10px;
+    z-index: 260;
+    width: 56px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 18px 0 0 18px;
+    background: #ffffff;
+    box-shadow: 0 5px 11px rgba(96, 107, 129, 0.2);
+    color: #ffffff;
+    font-family: var(--font-family);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), opacity 0.18s ease;
+    overflow: hidden;
+    outline: none;
+    opacity: 0.75;
+}
+
+.floating-refresh-button[data-edge="left"] {
+    --fab-icon-center-x: calc(100% - 21px);
+    left: -10px;
+    right: auto;
+    border-radius: 0 18px 18px 0;
+}
+
+.floating-refresh-button[data-edge="right"] {
+    --fab-icon-center-x: 21px;
+    right: -10px;
+    left: auto;
+    border-radius: 18px 0 0 18px;
+}
+
+.floating-refresh-button::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 6px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #df85a8;
+    box-shadow: inset 0 -1px 0 rgba(183, 77, 117, 0.22);
+    pointer-events: none;
+}
+
+.floating-refresh-button::after {
+    content: none;
+}
+
+.floating-refresh-button[data-edge="left"]::before {
+    left: auto;
+    right: 6px;
+}
+
+.floating-refresh-button .floating-refresh-icon {
+    position: absolute;
+    top: 50%;
+    left: var(--fab-icon-center-x);
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    transition: transform 0.18s ease, opacity 0.16s ease;
+}
+
+.floating-refresh-button .floating-refresh-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 2.15;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}
+
+.floating-refresh-button[data-edge="right"] .floating-refresh-icon {
+    transform: translate(-50%, -50%);
+}
+
+.floating-refresh-button[data-edge="left"] .floating-refresh-icon {
+    transform: translate(-50%, -50%);
+}
+
+.floating-refresh-button:hover {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 6px 12px rgba(96, 107, 129, 0.23);
+    opacity: 0.82;
+}
+
+.floating-refresh-button:active {
+    transform: translateY(0) scale(0.985);
+}
+
+.floating-refresh-button.is-dragging {
+    cursor: grabbing;
+    transform: none !important;
+    background: transparent !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+    overflow: visible;
+}
+
+.floating-refresh-button.is-dragging::before {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.95), 0 6px 12px rgba(96, 107, 129, 0.24);
+}
+
+.floating-refresh-button.is-dragging .floating-refresh-icon {
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.floating-refresh-button.snap-anim {
+    transition: top 0.25s var(--ease-out),
+        left 0.25s var(--ease-out),
+        right 0.25s var(--ease-out),
+        transform 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out),
+        background 0.2s ease;
+}
+
+.floating-refresh-button.is-loading {
+    pointer-events: none;
+    opacity: 0.75;
+}
+
+.floating-refresh-button.is-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: var(--fab-icon-center-x);
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.38);
+    border-top-color: rgba(255, 255, 255, 1);
+    border-radius: 50%;
+    animation: floating-refresh-spin 0.8s linear infinite;
+    z-index: 2;
+}
+
+.floating-refresh-button.is-loading .floating-refresh-icon {
+    opacity: 0;
+}
+
+@keyframes floating-refresh-spin {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+@media (max-width: 768px) {
+    .floating-refresh-button {
+        --fab-icon-center-x: 18px;
+        width: 50px;
+        height: 34px;
+        right: -8px;
+        border-radius: 17px 0 0 17px;
+        box-shadow: 0 4px 9px rgba(96, 107, 129, 0.2);
+    }
+
+    .floating-refresh-button[data-edge="left"] {
+        --fab-icon-center-x: calc(100% - 18px);
+        left: -8px;
+        border-radius: 0 17px 17px 0;
+    }
+
+    .floating-refresh-button[data-edge="right"] {
+        --fab-icon-center-x: 18px;
+        right: -8px;
+        border-radius: 17px 0 0 17px;
+    }
+
+    .floating-refresh-button::before {
+        top: 3px;
+        left: 5px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+    }
+
+    .floating-refresh-button[data-edge="left"]::before {
+        left: auto;
+        right: 5px;
+    }
+
+    .floating-refresh-button .floating-refresh-icon {
+        width: 14px;
+        height: 14px;
+    }
+
+    .floating-refresh-button .floating-refresh-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .floating-refresh-button.is-dragging::before {
+        width: 26px;
+        height: 26px;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 5px 10px rgba(96, 107, 129, 0.22);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .floating-refresh-button,
+    .floating-refresh-button.snap-anim,
+    .floating-refresh-button.is-loading::after {
+        transition: none !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
