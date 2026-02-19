@@ -192,6 +192,32 @@ function parseValue(val) {
     return isNaN(num) ? val.toLowerCase() : num;
 }
 
+function syncModalBodyLock() {
+    if (typeof document === 'undefined' || !document.body) {
+        return;
+    }
+    const hasActiveModal = Boolean(document.querySelector('.sector-modal.active, .confirm-dialog.active'));
+    document.body.classList.toggle('modal-open', hasActiveModal);
+}
+
+function openOverlay(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+        return;
+    }
+    modal.classList.add('active');
+    syncModalBodyLock();
+}
+
+function closeOverlay(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+        return;
+    }
+    modal.classList.remove('active');
+    syncModalBodyLock();
+}
+
 function openTab(evt, tabId) {
     // Hide all tab contents
     const allContents = document.querySelectorAll('.tab-content');
@@ -303,27 +329,35 @@ async function openFundSelectionModal(operation) {
         renderFundSelectionList(filteredFunds);
 
         // 显示模态框
-        document.getElementById('fundSelectionModal').classList.add('active');
+        openOverlay('fundSelectionModal');
     } catch (e) {
-        alert('获取基金列表失败: ' + e.message);
+        showNoticeDialog('获取基金列表失败: ' + e.message, { tone: 'danger' });
     }
 }
 
 // 渲染基金选择列表
 function renderFundSelectionList(funds) {
     const listContainer = document.getElementById('fundSelectionList');
-    listContainer.innerHTML = funds.map(fund => `
-            <div class="sector-item" style="text-align: left; padding: 12px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px;"
-                 onclick="toggleFundSelection('${fund.code}', this)">
+    if (!listContainer) {
+        return;
+    }
+    listContainer.innerHTML = funds.map(fund => {
+        const checked = selectedFundsForOperation.includes(fund.code);
+        return `
+            <div class="fund-select-item${checked ? ' is-selected' : ''}" onclick="toggleFundSelection('${fund.code}', this)">
                 <input type="checkbox" class="fund-selection-checkbox" data-code="${fund.code}"
-                       style="width: 18px; height: 18px; cursor: pointer;" onclick="event.stopPropagation(); toggleFundSelectionByCheckbox('${fund.code}', this)">
-                <div style="flex: 1;">
-                    <div style="font-weight: 600;">${fund.code} - ${fund.name}</div>
-                    ${fund.is_hold ? '<span style="color: #667eea; font-size: 12px;">持有</span>' : ''}
-                    ${fund.sectors && fund.sectors.length > 0 ? `<span style="color: #8b949e; font-size: 12px;">板块: ${fund.sectors.join(', ')}</span>` : ''}
+                       ${checked ? 'checked' : ''}
+                       onclick="event.stopPropagation(); toggleFundSelectionByCheckbox('${fund.code}', this)">
+                <div class="fund-select-content">
+                    <div class="fund-select-title">${fund.code} - ${fund.name}</div>
+                    <div class="fund-select-meta">
+                        ${fund.is_hold ? '<span class="fund-select-tag">持有</span>' : ''}
+                        ${fund.sectors && fund.sectors.length > 0 ? `<span class="fund-select-sectors">板块: ${fund.sectors.join(', ')}</span>` : ''}
+                    </div>
                 </div>
             </div>
-        `).join('');
+        `;
+    }).join('');
 }
 
 // 切换基金选择状态（点击整个行）
@@ -335,7 +369,10 @@ function toggleFundSelection(code, element) {
 
 // 切换基金选择状态（点击复选框）
 function toggleFundSelectionByCheckbox(code, checkbox) {
-    const element = checkbox.closest('.sector-item');
+    const element = checkbox.closest('.fund-select-item');
+    if (!element) {
+        return;
+    }
     updateFundSelection(code, checkbox.checked, element);
 }
 
@@ -345,16 +382,15 @@ function updateFundSelection(code, checked, element) {
         if (!selectedFundsForOperation.includes(code)) {
             selectedFundsForOperation.push(code);
         }
-        element.style.backgroundColor = 'rgba(102, 126, 234, 0.2)';
     } else {
         selectedFundsForOperation = selectedFundsForOperation.filter(c => c !== code);
-        element.style.backgroundColor = '';
     }
+    element.classList.toggle('is-selected', checked);
 }
 
 // 关闭基金选择模态框
 function closeFundSelectionModal() {
-    document.getElementById('fundSelectionModal').classList.remove('active');
+    closeOverlay('fundSelectionModal');
     currentOperation = null;
     selectedFundsForOperation = [];
 }
@@ -362,7 +398,7 @@ function closeFundSelectionModal() {
 // 确认基金选择
 async function confirmFundSelection() {
     if (selectedFundsForOperation.length === 0) {
-        alert('请至少选择一个基金');
+        showNoticeDialog('请至少选择一个基金', { tone: 'warning' });
         return;
     }
 
@@ -407,16 +443,134 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // 确认对话框相关函数
 let confirmCallback = null;
+let noticeDialogState = {
+    onConfirm: null,
+    onClose: null
+};
+
+function inferMessageTone(message) {
+    const text = String(message || '');
+    if (/失败|错误|无效|不能|异常|超时/.test(text)) {
+        return 'danger';
+    }
+    if (/成功|完成|已/.test(text)) {
+        return 'success';
+    }
+    if (/请|确认|注意/.test(text)) {
+        return 'warning';
+    }
+    return 'info';
+}
+
+function ensureNoticeDialogExists() {
+    let dialog = document.getElementById('noticeDialog');
+    if (!dialog) {
+        dialog = document.createElement('div');
+        dialog.className = 'confirm-dialog';
+        dialog.id = 'noticeDialog';
+        dialog.dataset.modalTone = 'info';
+        dialog.dataset.dismissible = '1';
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        dialog.setAttribute('aria-labelledby', 'noticeTitle');
+        dialog.setAttribute('aria-describedby', 'noticeMessage');
+        dialog.innerHTML = `
+            <div class="confirm-dialog-content modal-panel modal-panel-compact">
+                <h3 id="noticeTitle" class="confirm-title">提示</h3>
+                <p id="noticeMessage" class="confirm-message"></p>
+                <div class="confirm-actions">
+                    <button class="btn btn-primary" id="noticeConfirmBtn" type="button">我知道了</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(dialog);
+    }
+
+    if (!dialog.dataset.bound) {
+        dialog.addEventListener('click', (event) => {
+            if (event.target !== dialog) {
+                return;
+            }
+            if (dialog.dataset.dismissible === '1') {
+                closeNoticeDialog('close');
+            }
+        });
+        const confirmBtn = dialog.querySelector('#noticeConfirmBtn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => closeNoticeDialog('confirm'));
+        }
+        dialog.dataset.bound = '1';
+    }
+
+    return dialog;
+}
+
+function showNoticeDialog(message, options = {}) {
+    const dialog = ensureNoticeDialogExists();
+    const titleEl = dialog.querySelector('#noticeTitle');
+    const messageEl = dialog.querySelector('#noticeMessage');
+    const confirmBtn = dialog.querySelector('#noticeConfirmBtn');
+    const tone = options.tone || inferMessageTone(message);
+
+    dialog.dataset.modalTone = tone;
+    dialog.dataset.dismissible = options.dismissible === false ? '0' : '1';
+    noticeDialogState.onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+    noticeDialogState.onClose = typeof options.onClose === 'function' ? options.onClose : null;
+
+    if (titleEl) {
+        const titleMap = {
+            info: '提示',
+            success: '操作完成',
+            warning: '请注意',
+            danger: '操作失败'
+        };
+        titleEl.textContent = options.title || titleMap[tone] || '提示';
+    }
+    if (messageEl) {
+        messageEl.textContent = String(message || '');
+    }
+    if (confirmBtn) {
+        confirmBtn.textContent = options.confirmText || '我知道了';
+    }
+
+    openOverlay('noticeDialog');
+    setTimeout(() => confirmBtn?.focus(), 60);
+}
+
+function closeNoticeDialog(reason = 'close') {
+    const dialog = document.getElementById('noticeDialog');
+    if (!dialog || !dialog.classList.contains('active')) {
+        return;
+    }
+
+    closeOverlay('noticeDialog');
+    const onConfirm = noticeDialogState.onConfirm;
+    const onClose = noticeDialogState.onClose;
+    noticeDialogState = { onConfirm: null, onClose: null };
+
+    if (reason === 'confirm' && typeof onConfirm === 'function') {
+        onConfirm();
+    }
+    if (typeof onClose === 'function') {
+        onClose(reason);
+    }
+}
 
 function showConfirmDialog(title, message, onConfirm) {
+    const dialog = document.getElementById('confirmDialog');
+    if (!dialog) {
+        return;
+    }
+
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmMessage').textContent = message;
-    document.getElementById('confirmDialog').classList.add('active');
+    dialog.dataset.modalTone = /删除|移除|取消持有|清空/.test(`${title}${message}`) ? 'danger' : 'warning';
+    openOverlay('confirmDialog');
     confirmCallback = onConfirm;
 }
 
 function closeConfirmDialog() {
-    document.getElementById('confirmDialog').classList.remove('active');
+    closeOverlay('confirmDialog');
     confirmCallback = null;
 }
 
@@ -431,12 +585,79 @@ if (confirmBtn) {
     });
 }
 
+const confirmDialogEl = document.getElementById('confirmDialog');
+if (confirmDialogEl && !confirmDialogEl.dataset.dismissBound) {
+    confirmDialogEl.addEventListener('click', (event) => {
+        if (event.target === confirmDialogEl) {
+            closeConfirmDialog();
+        }
+    });
+    confirmDialogEl.dataset.dismissBound = '1';
+}
+
+function bindBackdropDismiss(modalId, closeHandler) {
+    const modal = document.getElementById(modalId);
+    if (!modal || modal.dataset.backdropBound) {
+        return;
+    }
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeHandler();
+        }
+    });
+    modal.dataset.backdropBound = '1';
+}
+
+bindBackdropDismiss('sectorModal', closeSectorModal);
+bindBackdropDismiss('fundSelectionModal', closeFundSelectionModal);
+bindBackdropDismiss('sharesModal', () => window.closeSharesModal?.());
+bindBackdropDismiss('fundChartSelectorModal', () => window.closeFundChartSelectorModal?.());
+
+function closeTopActiveModal() {
+    const noticeDialog = document.getElementById('noticeDialog');
+    if (noticeDialog && noticeDialog.classList.contains('active')) {
+        if (noticeDialog.dataset.dismissible === '1') {
+            closeNoticeDialog('close');
+        }
+        return true;
+    }
+
+    const stack = [
+        { id: 'fundChartSelectorModal', close: () => window.closeFundChartSelectorModal?.() },
+        { id: 'sharesModal', close: () => window.closeSharesModal?.() },
+        { id: 'confirmDialog', close: closeConfirmDialog },
+        { id: 'fundSelectionModal', close: closeFundSelectionModal },
+        { id: 'sectorModal', close: closeSectorModal }
+    ];
+
+    for (const item of stack) {
+        const modal = document.getElementById(item.id);
+        if (modal && modal.classList.contains('active')) {
+            item.close();
+            return true;
+        }
+    }
+    return false;
+}
+
+if (!window.__lanfundModalEscBound) {
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        if (closeTopActiveModal()) {
+            event.preventDefault();
+        }
+    });
+    window.__lanfundModalEscBound = true;
+}
+
 // 添加基金
 async function addFunds() {
     const input = document.getElementById('fundCodesInput');
     const codes = input.value.trim();
     if (!codes) {
-        alert('请输入基金代码');
+        showNoticeDialog('请输入基金代码', { tone: 'warning' });
         return;
     }
 
@@ -448,13 +669,17 @@ async function addFunds() {
         });
         const result = await response.json();
         if (result.success) {
-            alert(result.message);
-            location.reload();
+            showNoticeDialog(result.message, {
+                tone: 'success',
+                confirmText: '刷新页面',
+                dismissible: false,
+                onConfirm: () => location.reload()
+            });
         } else {
-            alert(result.message);
+            showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
         }
     } catch (e) {
-        alert('操作失败: ' + e.message);
+        showNoticeDialog('操作失败: ' + e.message, { tone: 'danger' });
     }
 }
 
@@ -472,13 +697,17 @@ async function deleteFunds(codes) {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert(result.message);
-                    location.reload();
+                    showNoticeDialog(result.message, {
+                        tone: 'success',
+                        confirmText: '刷新页面',
+                        dismissible: false,
+                        onConfirm: () => location.reload()
+                    });
                 } else {
-                    alert(result.message);
+                    showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
                 }
             } catch (e) {
-                alert('操作失败: ' + e.message);
+                showNoticeDialog('操作失败: ' + e.message, { tone: 'danger' });
             }
         }
     );
@@ -498,13 +727,17 @@ async function markHold(codes) {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert(result.message);
-                    location.reload();
+                    showNoticeDialog(result.message, {
+                        tone: 'success',
+                        confirmText: '刷新页面',
+                        dismissible: false,
+                        onConfirm: () => location.reload()
+                    });
                 } else {
-                    alert(result.message);
+                    showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
                 }
             } catch (e) {
-                alert('操作失败: ' + e.message);
+                showNoticeDialog('操作失败: ' + e.message, { tone: 'danger' });
             }
         }
     );
@@ -524,13 +757,17 @@ async function unmarkHold(codes) {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert(result.message);
-                    location.reload();
+                    showNoticeDialog(result.message, {
+                        tone: 'success',
+                        confirmText: '刷新页面',
+                        dismissible: false,
+                        onConfirm: () => location.reload()
+                    });
                 } else {
-                    alert(result.message);
+                    showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
                 }
             } catch (e) {
-                alert('操作失败: ' + e.message);
+                showNoticeDialog('操作失败: ' + e.message, { tone: 'danger' });
             }
         }
     );
@@ -541,7 +778,7 @@ let selectedCodesForSector = [];
 
 function openSectorModal(codes) {
     selectedCodesForSector = codes;
-    document.getElementById('sectorModal').classList.add('active');
+    openOverlay('sectorModal');
     renderSectorCategories();
 }
 
@@ -559,13 +796,17 @@ async function removeSector(codes) {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert(result.message);
-                    location.reload();
+                    showNoticeDialog(result.message, {
+                        tone: 'success',
+                        confirmText: '刷新页面',
+                        dismissible: false,
+                        onConfirm: () => location.reload()
+                    });
                 } else {
-                    alert(result.message);
+                    showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
                 }
             } catch (e) {
-                alert('操作失败: ' + e.message);
+                showNoticeDialog('操作失败: ' + e.message, { tone: 'danger' });
             }
         }
     );
@@ -617,22 +858,21 @@ function renderSectorCategories() {
     }
 
     selectedSectors = [];
-    document.getElementById('sectorModal').classList.add('active');
 }
 
 function closeSectorModal() {
-    document.getElementById('sectorModal').classList.remove('active');
+    closeOverlay('sectorModal');
     selectedSectors = [];
 }
 
 async function confirmSector() {
     if (selectedCodesForSector.length === 0) {
-        alert('请先选择基金');
+        showNoticeDialog('请先选择基金', { tone: 'warning' });
         closeSectorModal();
         return;
     }
     if (selectedSectors.length === 0) {
-        alert('请至少选择一个板块');
+        showNoticeDialog('请至少选择一个板块', { tone: 'warning' });
         return;
     }
 
@@ -645,14 +885,18 @@ async function confirmSector() {
         const result = await response.json();
         closeSectorModal();
         if (result.success) {
-            alert(result.message);
-            location.reload();
+            showNoticeDialog(result.message, {
+                tone: 'success',
+                confirmText: '刷新页面',
+                dismissible: false,
+                onConfirm: () => location.reload()
+            });
         } else {
-            alert(result.message);
+            showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
         }
     } catch (e) {
         closeSectorModal();
-        alert('操作失败: ' + e.message);
+        showNoticeDialog('操作失败: ' + e.message, { tone: 'danger' });
     }
 }
 
@@ -688,7 +932,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // 更新基金份额
     window.updateShares = async function (fundCode, shares) {
         if (!fundCode) {
-            alert('基金代码无效');
+            showNoticeDialog('基金代码无效', { tone: 'warning' });
             return;
         }
 
@@ -712,10 +956,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     }, 1000);
                 }
             } else {
-                alert(result.message);
+                showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
             }
         } catch (e) {
-            alert('更新份额失败: ' + e.message);
+            showNoticeDialog('更新份额失败: ' + e.message, { tone: 'danger' });
         }
     };
 
@@ -727,12 +971,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // 上传fund_map.json
     window.uploadFundMap = async function (file) {
         if (!file) {
-            alert('请选择文件');
+            showNoticeDialog('请选择文件', { tone: 'warning' });
             return;
         }
 
         if (!file.name.endsWith('.json')) {
-            alert('只支持JSON文件');
+            showNoticeDialog('只支持JSON文件', { tone: 'warning' });
             return;
         }
 
@@ -746,13 +990,17 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             const result = await response.json();
             if (result.success) {
-                alert(result.message);
-                location.reload();
+                showNoticeDialog(result.message, {
+                    tone: 'success',
+                    confirmText: '刷新页面',
+                    dismissible: false,
+                    onConfirm: () => location.reload()
+                });
             } else {
-                alert(result.message);
+                showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
             }
         } catch (e) {
-            alert('上传失败: ' + e.message);
+            showNoticeDialog('上传失败: ' + e.message, { tone: 'danger' });
         }
     };
 
@@ -942,6 +1190,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     const actColor = fund.actualGain >= 0 ? '#f44336' : '#4caf50';
                     const estSign = fund.estimatedGain >= 0 ? '+' : '-';
                     const actSign = fund.actualGain >= 0 ? '+' : '-';
+                    const estPct = Number(fund.estimatedGainPct) || 0;
+                    const actPct = Number(fund.actualGainPct) || 0;
+                    const estPctText = `${estPct > 0 ? '+' : (estPct < 0 ? '-' : '')}${Math.abs(estPct).toFixed(2)}%`;
+                    const actPctText = `${actPct > 0 ? '+' : (actPct < 0 ? '-' : '')}${Math.abs(actPct).toFixed(2)}%`;
                     // 基金名称中已包含板块标签，不再重复添加
                     return `
                             <tr style="border-bottom: 1px solid var(--border);">
@@ -950,9 +1202,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <td class="sensitive-value" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono);"><span class="real-value">${fund.shares.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><span class="hidden-value">****</span></td>
                                 <td class="sensitive-value" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); font-weight: 600;"><span class="real-value">${fund.positionValue.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><span class="hidden-value">****</span></td>
                                 <td class="sensitive-value ${estColor === '#f44336' ? 'positive' : 'negative'}" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); color: ${estColor}; font-weight: 500;"><span class="real-value">${estSign}${Math.abs(fund.estimatedGain).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><span class="hidden-value">****</span></td>
-                                <td class="${estColor === '#f44336' ? 'positive' : 'negative'}" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); color: ${estColor}; font-weight: 500;">${estSign}${fund.estimatedGainPct.toFixed(2)}%</td>
+                                <td class="${estColor === '#f44336' ? 'positive' : 'negative'}" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); color: ${estColor}; font-weight: 500;">${estPctText}</td>
                                 <td class="sensitive-value ${actColor === '#f44336' ? 'positive' : 'negative'}" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); color: ${actColor}; font-weight: 500;"><span class="real-value">${actSign}${Math.abs(fund.actualGain).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><span class="hidden-value">****</span></td>
-                                <td class="${actColor === '#f44336' ? 'positive' : 'negative'}" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); color: ${actColor}; font-weight: 500;">${actSign}${fund.actualGainPct.toFixed(2)}%</td>
+                                <td class="${actColor === '#f44336' ? 'positive' : 'negative'}" style="padding: 10px; text-align: center; vertical-align: middle; font-family: var(--font-mono); color: ${actColor}; font-weight: 500;">${actPctText}</td>
                             </tr>
                         `;
                 }).join('');
@@ -1018,32 +1270,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     summaryActualChange.textContent = '0.00%';
                     summaryActualChange.className = 'summary-change neutral';
-                }
-            }
-
-            // Update 今日实际涨跌 (new summary card)
-            const summaryRealGain = document.getElementById('summaryRealGain');
-            if (summaryRealGain) {
-                if (settledValue > 0) {
-                    const actSign = actualGain >= 0 ? '+' : '-';
-                    summaryRealGain.textContent = `${actSign}${Math.abs(actualGain).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    summaryRealGain.style.color = actualGain >= 0 ? '#f44336' : '#4caf50';
-                } else {
-                    summaryRealGain.textContent = '净值未更新';
-                    summaryRealGain.style.color = '';
-                }
-            }
-
-            const summaryRealChange = document.getElementById('summaryRealChange');
-            if (summaryRealChange) {
-                if (settledValue > 0) {
-                    const actGainPct = (actualGain / settledValue * 100);
-                    const actSign = actualGain >= 0 ? '+' : '';
-                    summaryRealChange.textContent = `${actSign}${actGainPct.toFixed(2)}%`;
-                    summaryRealChange.className = 'summary-change ' + (actualGain >= 0 ? 'positive' : 'negative');
-                } else {
-                    summaryRealChange.textContent = '--';
-                    summaryRealChange.className = 'summary-change neutral';
                 }
             }
 
@@ -1356,55 +1582,51 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
 
         const modalContent = `
-                <div class="sector-modal-content" style="max-width: 460px;">
-                    <div class="sector-modal-header">修改持仓</div>
-                    <div style="padding: 20px;">
-                        <div style="margin-bottom: 12px;">
-                            <label style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">最新净值（日期）</label>
-                            <div id="sharesModalNetInfo" style="padding: 10px; background: rgba(30, 41, 59, 0.45); border-radius: 6px; color: var(--text-main);">--</div>
-                        </div>
-                        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-                            <button id="sharesModalModeBtn" class="btn btn-secondary" onclick="toggleHoldingInputMode()">转换为份额输入</button>
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <label for="sharesModalAmountInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有金额</label>
-                            <input type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <label for="sharesModalInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持仓份额</label>
-                            <input type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <label for="sharesModalProfitInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有收益</label>
-                            <input type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <label for="sharesModalDaysInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有天数</label>
-                            <input type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                        </div>
-                        <div id="sharesModalSharesPreview" style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: var(--text-main); font-size: 13px;">
-                            换算份额：0.00 份 | 当前持仓市值：0.00
-                        </div>
-                        <div style="margin-top: 8px; font-size: 12px; color: var(--text-dim);">
-                            说明：金额和份额会按当前净值双向换算，保存时以份额为准。
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px;">
-                            <button class="btn btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.35);" onclick="openHoldingSyncAction('buy')">同步加仓</button>
-                            <button class="btn btn-secondary" style="color: #10b981; border-color: rgba(16,185,129,0.35);" onclick="openHoldingSyncAction('sell')">同步减仓</button>
-                            <button class="btn btn-secondary" style="color: #3b82f6; border-color: rgba(59,130,246,0.35);" onclick="openHoldingSyncAction('dca')">同步定投</button>
-                            <button class="btn btn-secondary" style="color: #6366f1; border-color: rgba(99,102,241,0.35);" onclick="openHoldingSyncAction('convert')">同步转换</button>
-                        </div>
+            <div class="sector-modal-content modal-panel modal-panel-compact">
+                <div class="sector-modal-header" id="sharesModalTitle">修改持仓</div>
+                <div class="modal-body">
+                    <div class="modal-field">
+                        <label class="modal-label">最新净值（日期）</label>
+                        <div id="sharesModalNetInfo" class="shares-net-info">--</div>
                     </div>
-                    <div class="sector-modal-footer">
-                        <button class="btn btn-secondary" onclick="closeSharesModal()">取消</button>
-                        <button class="btn btn-primary" onclick="confirmShares()">确定</button>
+                    <div class="shares-mode-row">
+                        <button id="sharesModalModeBtn" class="btn btn-secondary" type="button" onclick="toggleHoldingInputMode()">转换为份额输入</button>
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label" for="sharesModalAmountInput">持有金额</label>
+                        <input class="modal-input" type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额">
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label" for="sharesModalInput">持仓份额</label>
+                        <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额">
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label" for="sharesModalProfitInput">持有收益</label>
+                        <input class="modal-input" type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益">
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label" for="sharesModalDaysInput">持有天数</label>
+                        <input class="modal-input" type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数">
+                    </div>
+                    <div id="sharesModalSharesPreview" class="shares-preview">
+                        换算份额：0.00 份 | 当前持仓市值：0.00
+                    </div>
+                    <div class="shares-note">
+                        说明：金额和份额会按当前净值双向换算，保存时以份额为准。
+                    </div>
+                    <div class="holding-sync-grid">
+                        <button class="btn btn-secondary btn-soft-danger" type="button" onclick="openHoldingSyncAction('buy')">同步加仓</button>
+                        <button class="btn btn-secondary btn-soft-success" type="button" onclick="openHoldingSyncAction('sell')">同步减仓</button>
+                        <button class="btn btn-secondary btn-soft-info" type="button" onclick="openHoldingSyncAction('dca')">同步定投</button>
+                        <button class="btn btn-secondary btn-soft-violet" type="button" onclick="openHoldingSyncAction('convert')">同步转换</button>
                     </div>
                 </div>
-            `;
+                <div class="sector-modal-footer">
+                    <button class="btn btn-secondary" type="button" onclick="closeSharesModal()">取消</button>
+                    <button class="btn btn-primary" type="button" onclick="confirmShares()">确定</button>
+                </div>
+            </div>
+        `;
 
         let modal = document.getElementById('sharesModal');
         const hasCompleteStructure = requiredIds.every((id) => document.getElementById(id));
@@ -1420,6 +1642,11 @@ document.addEventListener('DOMContentLoaded', function () {
             modal.innerHTML = modalContent;
             document.body.appendChild(modal);
         }
+
+        modal.dataset.modalTone = 'info';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'sharesModalTitle');
 
         bindHoldingModalClose();
         bindHoldingModalInputs();
@@ -1455,7 +1682,7 @@ document.addEventListener('DOMContentLoaded', function () {
             convert: '同步转换'
         };
         const actionName = actionMap[action] || '同步操作';
-        alert(`${actionName}功能保留中，后续将接入对应页面`);
+        showNoticeDialog(`${actionName}功能保留中，后续将接入对应页面`, { tone: 'info' });
     };
 
     window.toggleHoldingInputMode = function () {
@@ -1496,13 +1723,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const dateText = formatNetValueDate(snapshot.netValueDate);
             const growthValue = snapshot.dayGrowth;
             let growthText = '--';
-            let growthColor = 'var(--text-dim)';
+            let growthColor = 'value-neutral';
             if (growthValue !== null && !Number.isNaN(growthValue)) {
                 growthText = `${growthValue >= 0 ? '+' : ''}${growthValue.toFixed(2)}%`;
-                growthColor = growthValue >= 0 ? '#ef4444' : '#16a34a';
+                growthColor = growthValue >= 0 ? 'value-positive' : 'value-negative';
             }
             netInfo.innerHTML =
-                `最新净值（${dateText}）：<span style="font-weight: 600;">${currentModalNetValue.toFixed(4)}</span> <span style="color: ${growthColor}; font-weight: 600;">${growthText}</span>`;
+                `最新净值（${dateText}）：<span class="shares-net-value">${currentModalNetValue.toFixed(4)}</span> <span class="shares-net-change ${growthColor}">${growthText}</span>`;
             amountInput.placeholder = '请输入持仓金额';
         } else {
             netInfo.textContent = '最新净值暂不可用';
@@ -1511,16 +1738,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         applyHoldingInputMode();
         updateHoldingDerivedValues('init');
-        modal.classList.add('active');
+        openOverlay('sharesModal');
         setTimeout(() => (holdingInputMode === 'amount' ? amountInput : sharesInput).focus(), 100);
     };
 
     // 关闭持仓设置弹窗
     window.closeSharesModal = function () {
-        const modal = document.getElementById('sharesModal');
-        if (modal) {
-            modal.classList.remove('active');
-        }
+        closeOverlay('sharesModal');
         currentSharesFundCode = null;
         currentModalNetValue = null;
     };
@@ -1528,7 +1752,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // 确认设置持仓（保存份额）
     window.confirmShares = async function () {
         if (!currentSharesFundCode) {
-            alert('未选择基金');
+            showNoticeDialog('未选择基金', { tone: 'warning' });
             return;
         }
 
@@ -1550,14 +1774,14 @@ document.addEventListener('DOMContentLoaded', function () {
         shares = roundToTwo(shares);
 
         if (shares < 0) {
-            alert('持仓份额不能为负数');
+            showNoticeDialog('持仓份额不能为负数', { tone: 'warning' });
             return;
         }
 
         if (daysRaw) {
             const parsedDays = parseInt(daysRaw, 10);
             if (Number.isNaN(parsedDays) || parsedDays < 0) {
-                alert('持有天数请输入大于等于 0 的整数');
+                showNoticeDialog('持有天数请输入大于等于 0 的整数', { tone: 'warning' });
                 return;
             }
         }
@@ -1581,12 +1805,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 calculatePositionSummary();
                 window.closeSharesModal();
 
-                alert(result.message);
+                showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
             } else {
-                alert(result.message);
+                showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
             }
         } catch (e) {
-            alert('更新持仓失败: ' + e.message);
+            showNoticeDialog('更新持仓失败: ' + e.message, { tone: 'danger' });
         }
     };
 

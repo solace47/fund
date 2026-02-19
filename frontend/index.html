@@ -93,11 +93,6 @@
           <div class="summary-change neutral" id="summaryActualChange">+0.00%</div>
         </div>
         <div class="summary-card">
-          <div class="summary-label">今日实际涨跌</div>
-          <div class="summary-value" id="summaryRealGain">净值未更新</div>
-          <div class="summary-change neutral" id="summaryRealChange">--</div>
-        </div>
-        <div class="summary-card">
           <div class="summary-label">持仓数量</div>
           <div class="summary-value" id="summaryHoldCount">0 只</div>
           <div class="summary-change neutral">已标记</div>
@@ -137,99 +132,89 @@
     </main>
   </div>
 
-  <div class="sector-modal" id="sectorModal">
-    <div class="sector-modal-content">
-      <div class="sector-modal-header">选择板块</div>
+  <div class="sector-modal" id="sectorModal" data-modal-tone="info" role="dialog" aria-modal="true"
+    aria-labelledby="sectorModalTitle">
+    <div class="sector-modal-content modal-panel">
+      <div class="sector-modal-header" id="sectorModalTitle">选择板块</div>
       <input type="text" class="sector-modal-search" id="sectorSearch" placeholder="搜索板块名称..." />
-      <div id="sectorCategories"></div>
+      <div id="sectorCategories" class="modal-scroll-body"></div>
       <div class="sector-modal-footer">
-        <button class="btn btn-secondary" onclick="closeSectorModal()">取消</button>
-        <button class="btn btn-primary" onclick="confirmSector()">确定</button>
+        <button class="btn btn-secondary" type="button" onclick="closeSectorModal()">取消</button>
+        <button class="btn btn-primary" type="button" onclick="confirmSector()">确定</button>
       </div>
     </div>
   </div>
 
-  <div class="sector-modal" id="fundSelectionModal">
-    <div class="sector-modal-content">
+  <div class="sector-modal" id="fundSelectionModal" data-modal-tone="info" role="dialog" aria-modal="true"
+    aria-labelledby="fundSelectionTitle">
+    <div class="sector-modal-content modal-panel">
       <div class="sector-modal-header" id="fundSelectionTitle">选择基金</div>
       <input type="text" class="sector-modal-search" id="fundSelectionSearch" placeholder="搜索基金代码或名称..." />
-      <div id="fundSelectionList" style="max-height: 400px; overflow-y: auto;"></div>
+      <div id="fundSelectionList" class="fund-selection-list"></div>
       <div class="sector-modal-footer">
-        <button class="btn btn-secondary" onclick="closeFundSelectionModal()">取消</button>
-        <button class="btn btn-primary" id="fundSelectionConfirmBtn" onclick="confirmFundSelection()">确定</button>
+        <button class="btn btn-secondary" type="button" onclick="closeFundSelectionModal()">取消</button>
+        <button class="btn btn-primary" id="fundSelectionConfirmBtn" type="button" onclick="confirmFundSelection()">确定</button>
       </div>
     </div>
   </div>
 
-  <div class="confirm-dialog" id="confirmDialog">
-    <div class="confirm-dialog-content">
+  <div class="confirm-dialog" id="confirmDialog" data-modal-tone="warning" role="dialog" aria-modal="true"
+    aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <div class="confirm-dialog-content modal-panel modal-panel-compact">
       <h3 id="confirmTitle" class="confirm-title"></h3>
       <p id="confirmMessage" class="confirm-message"></p>
       <div class="confirm-actions">
-        <button class="btn btn-secondary" onclick="closeConfirmDialog()">取消</button>
-        <button class="btn btn-primary" id="confirmBtn">确定</button>
+        <button class="btn btn-secondary" type="button" onclick="closeConfirmDialog()">取消</button>
+        <button class="btn btn-primary" type="button" id="confirmBtn">确定</button>
       </div>
     </div>
   </div>
 
-  <div class="sector-modal" id="sharesModal">
-    <div class="sector-modal-content" style="max-width: 460px;">
-      <div class="sector-modal-header">修改持仓</div>
-      <div style="padding: 20px;">
-        <div style="margin-bottom: 12px;">
-          <label style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">最新净值（日期）</label>
-          <div id="sharesModalNetInfo"
-            style="padding: 10px; background: rgba(30, 41, 59, 0.45); border-radius: 6px; color: var(--text-main);">--
-          </div>
+  <div class="sector-modal" id="sharesModal" data-modal-tone="info" role="dialog" aria-modal="true"
+    aria-labelledby="sharesModalTitle">
+    <div class="sector-modal-content modal-panel modal-panel-compact">
+      <div class="sector-modal-header" id="sharesModalTitle">修改持仓</div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">最新净值（日期）</label>
+          <div id="sharesModalNetInfo" class="shares-net-info">--</div>
         </div>
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-          <button id="sharesModalModeBtn" class="btn btn-secondary" onclick="toggleHoldingInputMode()">转换为份额输入</button>
+        <div class="shares-mode-row">
+          <button id="sharesModalModeBtn" class="btn btn-secondary" type="button"
+            onclick="toggleHoldingInputMode()">转换为份额输入</button>
         </div>
-        <div style="margin-bottom: 12px;">
-          <label for="sharesModalAmountInput"
-            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有金额</label>
-          <input type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额"
-            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        <div class="modal-field">
+          <label class="modal-label" for="sharesModalAmountInput">持有金额</label>
+          <input class="modal-input" type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额" />
         </div>
-        <div style="margin-bottom: 12px;">
-          <label for="sharesModalInput"
-            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持仓份额</label>
-          <input type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额"
-            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        <div class="modal-field">
+          <label class="modal-label" for="sharesModalInput">持仓份额</label>
+          <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额" />
         </div>
-        <div style="margin-bottom: 12px;">
-          <label for="sharesModalProfitInput"
-            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有收益</label>
-          <input type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益"
-            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        <div class="modal-field">
+          <label class="modal-label" for="sharesModalProfitInput">持有收益</label>
+          <input class="modal-input" type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益" />
         </div>
-        <div style="margin-bottom: 12px;">
-          <label for="sharesModalDaysInput"
-            style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有天数</label>
-          <input type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数"
-            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);" />
+        <div class="modal-field">
+          <label class="modal-label" for="sharesModalDaysInput">持有天数</label>
+          <input class="modal-input" type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数" />
         </div>
-        <div id="sharesModalSharesPreview"
-          style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: var(--text-main); font-size: 13px;">
+        <div id="sharesModalSharesPreview" class="shares-preview">
           换算份额：0.00 份 | 当前持仓市值：0.00
         </div>
-        <div style="margin-top: 8px; font-size: 12px; color: var(--text-dim);">
+        <div class="shares-note">
           说明：金额和份额会按当前净值双向换算，保存时以份额为准。
         </div>
-        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px;">
-          <button class="btn btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.35);"
-            onclick="openHoldingSyncAction('buy')">同步加仓</button>
-          <button class="btn btn-secondary" style="color: #10b981; border-color: rgba(16,185,129,0.35);"
-            onclick="openHoldingSyncAction('sell')">同步减仓</button>
-          <button class="btn btn-secondary" style="color: #3b82f6; border-color: rgba(59,130,246,0.35);"
-            onclick="openHoldingSyncAction('dca')">同步定投</button>
-          <button class="btn btn-secondary" style="color: #6366f1; border-color: rgba(99,102,241,0.35);"
-            onclick="openHoldingSyncAction('convert')">同步转换</button>
+        <div class="holding-sync-grid">
+          <button class="btn btn-secondary btn-soft-danger" type="button" onclick="openHoldingSyncAction('buy')">同步加仓</button>
+          <button class="btn btn-secondary btn-soft-success" type="button" onclick="openHoldingSyncAction('sell')">同步减仓</button>
+          <button class="btn btn-secondary btn-soft-info" type="button" onclick="openHoldingSyncAction('dca')">同步定投</button>
+          <button class="btn btn-secondary btn-soft-violet" type="button" onclick="openHoldingSyncAction('convert')">同步转换</button>
         </div>
       </div>
       <div class="sector-modal-footer">
-        <button class="btn btn-secondary" onclick="closeSharesModal()">取消</button>
-        <button class="btn btn-primary" onclick="confirmShares()">确定</button>
+        <button class="btn btn-secondary" type="button" onclick="closeSharesModal()">取消</button>
+        <button class="btn btn-primary" type="button" onclick="confirmShares()">确定</button>
       </div>
     </div>
   </div>

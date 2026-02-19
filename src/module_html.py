@@ -196,8 +196,8 @@ def get_table_html(title, data, sortable_columns=None):
 
 def get_full_page_html_sidebar(tabs_data, username=None):
     """Generate full page HTML with sidebar navigation"""
-    js_script = get_javascript_code()
     css_style = get_css_style()
+    modal_html = get_shared_modal_html()
 
     # Get fund data for holdings/watchlist sections
     fund_map = {}
@@ -251,102 +251,8 @@ def get_full_page_html_sidebar(tabs_data, username=None):
         </main>
     </div>
 
-    <!-- Modals (preserved) -->
-    <!-- 板块选择对话框 -->
-    <div class="sector-modal" id="sectorModal">
-        <div class="sector-modal-content">
-            <div class="sector-modal-header">选择板块</div>
-            <input type="text" class="sector-modal-search" id="sectorSearch" placeholder="搜索板块名称...">
-            <div id="sectorCategories">
-                <!-- 板块分类将通过JS动态生成 -->
-            </div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeSectorModal()">取消</button>
-                <button class="btn btn-primary" onclick="confirmSector()">确定</button>
-            </div>
-        </div>
-    </div>
+    {modal_html}
 
-    <!-- 基金选择对话框 -->
-    <div class="sector-modal" id="fundSelectionModal">
-        <div class="sector-modal-content">
-            <div class="sector-modal-header" id="fundSelectionTitle">选择基金</div>
-            <input type="text" class="sector-modal-search" id="fundSelectionSearch" placeholder="搜索基金代码或名称...">
-            <div id="fundSelectionList" style="max-height: 400px; overflow-y: auto;">
-                <!-- 基金列表将通过JS动态生成 -->
-            </div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeFundSelectionModal()">取消</button>
-                <button class="btn btn-primary" id="fundSelectionConfirmBtn" onclick="confirmFundSelection()">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 确认对话框 -->
-    <div class="confirm-dialog" id="confirmDialog">
-        <div class="confirm-dialog-content">
-            <h3 id="confirmTitle" class="confirm-title"></h3>
-            <p id="confirmMessage" class="confirm-message"></p>
-            <div class="confirm-actions">
-                <button class="btn btn-secondary" onclick="closeConfirmDialog()">取消</button>
-                <button class="btn btn-primary" id="confirmBtn">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 持仓设置弹窗 -->
-    <div class="sector-modal" id="sharesModal">
-        <div class="sector-modal-content" style="max-width: 460px;">
-            <div class="sector-modal-header">修改持仓</div>
-            <div style="padding: 20px;">
-                <div style="margin-bottom: 12px;">
-                    <label style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">最新净值（日期）</label>
-                    <div id="sharesModalNetInfo" style="padding: 10px; background: rgba(30, 41, 59, 0.45); border-radius: 6px; color: var(--text-main);">--</div>
-                </div>
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-                    <button id="sharesModalModeBtn" class="btn btn-secondary" onclick="toggleHoldingInputMode()">转换为份额输入</button>
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalAmountInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有金额</label>
-                    <input type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持仓份额</label>
-                    <input type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalProfitInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有收益</label>
-                    <input type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalDaysInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有天数</label>
-                    <input type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div id="sharesModalSharesPreview" style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: var(--text-main); font-size: 13px;">
-                    换算份额：0.00 份 | 当前持仓市值：0.00
-                </div>
-                <div style="margin-top: 8px; font-size: 12px; color: var(--text-dim);">
-                    说明：金额和份额会按当前净值双向换算，保存时以份额为准。
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px;">
-                    <button class="btn btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.35);" onclick="openHoldingSyncAction('buy')">同步加仓</button>
-                    <button class="btn btn-secondary" style="color: #10b981; border-color: rgba(16,185,129,0.35);" onclick="openHoldingSyncAction('sell')">同步减仓</button>
-                    <button class="btn btn-secondary" style="color: #3b82f6; border-color: rgba(59,130,246,0.35);" onclick="openHoldingSyncAction('dca')">同步定投</button>
-                    <button class="btn btn-secondary" style="color: #6366f1; border-color: rgba(99,102,241,0.35);" onclick="openHoldingSyncAction('convert')">同步转换</button>
-                </div>
-            </div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeSharesModal()">取消</button>
-                <button class="btn btn-primary" onclick="confirmShares()">确定</button>
-            </div>
-        </div>
-    </div>
-
-    {js_script}
     <script src="/static/js/main.js"></script>
     <script src="/static/js/sidebar-nav.js"></script>
 </body>
@@ -360,8 +266,8 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
     if use_sidebar:
         return get_full_page_html_sidebar(tabs_data, username)
 
-    js_script = get_javascript_code()
     css_style = get_css_style()
+    modal_html = get_shared_modal_html()
 
     # Generate Tab Headers
     tab_headers = []
@@ -378,6 +284,7 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>LanFund Dashboard</title>
             {css_style}
+            <link rel="stylesheet" href="/static/css/style.css">
         </head>
         <body>
             <div class="app-container">
@@ -387,7 +294,7 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
                     </div>
                 </div>
             </div>
-            {js_script}
+            <script src="/static/js/main.js"></script>
         </body>
         </html>
         """
@@ -422,7 +329,7 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
 
     if not has_data:
         # Return SSE-enabled loading page
-        return get_sse_loading_page(css_style, js_script)
+        return get_sse_loading_page(css_style)
 
     return f"""
     <!DOCTYPE html>
@@ -435,6 +342,7 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
         <meta http-equiv="Expires" content="0">
         <title>LanFund Dashboard</title>
         {css_style}
+        <link rel="stylesheet" href="/static/css/style.css">
     </head>
     <body>
         <div class="app-container">
@@ -448,55 +356,14 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
             </div>
         </div>
 
-        <!-- 板块选择对话框 -->
-        <div class="sector-modal" id="sectorModal">
-            <div class="sector-modal-content">
-                <div class="sector-modal-header">选择板块</div>
-                <input type="text" class="sector-modal-search" id="sectorSearch" placeholder="搜索板块名称...">
-                <div id="sectorCategories">
-                    <!-- 板块分类将通过JS动态生成 -->
-                </div>
-                <div class="sector-modal-footer">
-                    <button class="btn btn-secondary" onclick="closeSectorModal()">取消</button>
-                    <button class="btn btn-primary" onclick="confirmSector()">确定</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 基金选择对话框 -->
-        <div class="sector-modal" id="fundSelectionModal">
-            <div class="sector-modal-content">
-                <div class="sector-modal-header" id="fundSelectionTitle">选择基金</div>
-                <input type="text" class="sector-modal-search" id="fundSelectionSearch" placeholder="搜索基金代码或名称...">
-                <div id="fundSelectionList" style="max-height: 400px; overflow-y: auto;">
-                    <!-- 基金列表将通过JS动态生成 -->
-                </div>
-                <div class="sector-modal-footer">
-                    <button class="btn btn-secondary" onclick="closeFundSelectionModal()">取消</button>
-                    <button class="btn btn-primary" id="fundSelectionConfirmBtn" onclick="confirmFundSelection()">确定</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 确认对话框 -->
-        <div class="confirm-dialog" id="confirmDialog">
-            <div class="confirm-dialog-content">
-                <h3 id="confirmTitle" class="confirm-title"></h3>
-                <p id="confirmMessage" class="confirm-message"></p>
-                <div class="confirm-actions">
-                    <button class="btn btn-secondary" onclick="closeConfirmDialog()">取消</button>
-                    <button class="btn btn-primary" id="confirmBtn">确定</button>
-                </div>
-            </div>
-        </div>
-
-        {js_script}
+        {modal_html}
+        <script src="/static/js/main.js"></script>
     </body>
     </html>
     """
 
 
-def get_sse_loading_page(css_style, js_script):
+def get_sse_loading_page(css_style):
     """Return a loading page that will be updated via SSE"""
     return f"""
     <!DOCTYPE html>
@@ -713,16 +580,120 @@ def get_summary_bar_html():
     <div class="summary-change neutral" id="summaryActualChange">+0.00%</div>
   </div>
   <div class="summary-card">
-    <div class="summary-label">今日实际涨跌</div>
-    <div class="summary-value" id="summaryRealGain">净值未更新</div>
-    <div class="summary-change neutral" id="summaryRealChange">--</div>
-  </div>
-  <div class="summary-card">
     <div class="summary-label">持仓数量</div>
     <div class="summary-value" id="summaryHoldCount">0 只</div>
     <div class="summary-change neutral">已标记</div>
   </div>
 </section>'''
+
+
+def get_shared_modal_html(include_fund_chart_selector=False):
+    """Generate shared modal markup using the unified visual modal system."""
+    fund_chart_selector_modal = ''
+    if include_fund_chart_selector:
+        fund_chart_selector_modal = '''
+    <div class="sector-modal" id="fundChartSelectorModal" data-modal-tone="info" role="dialog" aria-modal="true"
+         aria-labelledby="fundChartSelectorModalTitle">
+        <div class="sector-modal-content modal-panel">
+            <div class="sector-modal-header" id="fundChartSelectorModalTitle">选择基金</div>
+            <input type="text" class="sector-modal-search modal-input" id="fundChartSelectorSearch" placeholder="搜索基金代码或名称...">
+            <div id="fundChartSelectorList" class="fund-selection-list"></div>
+            <div class="sector-modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeFundChartSelectorModal()">取消</button>
+            </div>
+        </div>
+    </div>
+'''
+
+    return f'''
+    <div class="sector-modal" id="sectorModal" data-modal-tone="info" role="dialog" aria-modal="true"
+         aria-labelledby="sectorModalTitle">
+        <div class="sector-modal-content modal-panel">
+            <div class="sector-modal-header" id="sectorModalTitle">选择板块</div>
+            <input type="text" class="sector-modal-search" id="sectorSearch" placeholder="搜索板块名称...">
+            <div id="sectorCategories" class="modal-scroll-body"></div>
+            <div class="sector-modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeSectorModal()">取消</button>
+                <button class="btn btn-primary" type="button" onclick="confirmSector()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sector-modal" id="fundSelectionModal" data-modal-tone="info" role="dialog" aria-modal="true"
+         aria-labelledby="fundSelectionTitle">
+        <div class="sector-modal-content modal-panel">
+            <div class="sector-modal-header" id="fundSelectionTitle">选择基金</div>
+            <input type="text" class="sector-modal-search" id="fundSelectionSearch" placeholder="搜索基金代码或名称...">
+            <div id="fundSelectionList" class="fund-selection-list"></div>
+            <div class="sector-modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeFundSelectionModal()">取消</button>
+                <button class="btn btn-primary" id="fundSelectionConfirmBtn" type="button" onclick="confirmFundSelection()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="confirm-dialog" id="confirmDialog" data-modal-tone="warning" role="dialog" aria-modal="true"
+         aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+        <div class="confirm-dialog-content modal-panel modal-panel-compact">
+            <h3 id="confirmTitle" class="confirm-title"></h3>
+            <p id="confirmMessage" class="confirm-message"></p>
+            <div class="confirm-actions">
+                <button class="btn btn-secondary" type="button" onclick="closeConfirmDialog()">取消</button>
+                <button class="btn btn-primary" type="button" id="confirmBtn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    {fund_chart_selector_modal}
+
+    <div class="sector-modal" id="sharesModal" data-modal-tone="info" role="dialog" aria-modal="true"
+         aria-labelledby="sharesModalTitle">
+        <div class="sector-modal-content modal-panel modal-panel-compact">
+            <div class="sector-modal-header" id="sharesModalTitle">修改持仓</div>
+            <div class="modal-body">
+                <div class="modal-field">
+                    <label class="modal-label">最新净值（日期）</label>
+                    <div id="sharesModalNetInfo" class="shares-net-info">--</div>
+                </div>
+                <div class="shares-mode-row">
+                    <button id="sharesModalModeBtn" class="btn btn-secondary" type="button" onclick="toggleHoldingInputMode()">转换为份额输入</button>
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label" for="sharesModalAmountInput">持有金额</label>
+                    <input class="modal-input" type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label" for="sharesModalInput">持仓份额</label>
+                    <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label" for="sharesModalProfitInput">持有收益</label>
+                    <input class="modal-input" type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label" for="sharesModalDaysInput">持有天数</label>
+                    <input class="modal-input" type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数">
+                </div>
+                <div id="sharesModalSharesPreview" class="shares-preview">
+                    换算份额：0.00 份 | 当前持仓市值：0.00
+                </div>
+                <div class="shares-note">
+                    说明：金额和份额会按当前净值双向换算，保存时以份额为准。
+                </div>
+                <div class="holding-sync-grid">
+                    <button class="btn btn-secondary btn-soft-danger" type="button" onclick="openHoldingSyncAction('buy')">同步加仓</button>
+                    <button class="btn btn-secondary btn-soft-success" type="button" onclick="openHoldingSyncAction('sell')">同步减仓</button>
+                    <button class="btn btn-secondary btn-soft-info" type="button" onclick="openHoldingSyncAction('dca')">同步定投</button>
+                    <button class="btn btn-secondary btn-soft-violet" type="button" onclick="openHoldingSyncAction('convert')">同步转换</button>
+                </div>
+            </div>
+            <div class="sector-modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeSharesModal()">取消</button>
+                <button class="btn btn-primary" type="button" onclick="confirmShares()">确定</button>
+            </div>
+        </div>
+    </div>
+'''
 
 
 def generate_fund_row_html(fund_code, fund_data, is_held=True):
@@ -1830,1105 +1801,8 @@ def get_css_style():
 
 
 def get_javascript_code():
-    return r"""
-    <!-- Standard JS for table coloring -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        autoColorize();
-    });
-
-    function autoColorize() {
-        const cells = document.querySelectorAll('.style-table td');
-        cells.forEach(cell => {
-            const text = cell.textContent.trim();
-            const cleanText = text.replace(/[%,亿万手]/g, '');
-            const val = parseFloat(cleanText);
-
-            if (!isNaN(val)) {
-                if (text.includes('%') || text.includes('涨跌')) {
-                    if (text.includes('-')) {
-                        cell.classList.add('negative');
-                    } else if (val > 0) {
-                        cell.classList.add('positive');
-                    }
-                } else if (text.startsWith('-')) {
-                    cell.classList.add('negative');
-                } else if (text.startsWith('+')) {
-                    cell.classList.add('positive');
-                }
-            }
-        });
-    }
-
-    function sortTable(table, columnIndex) {
-        const tbody = table.querySelector('tbody');
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        const currentSortCol = table.dataset.sortCol;
-        const currentSortDir = table.dataset.sortDir || 'asc';
-        let direction = 'asc';
-
-        if (currentSortCol == columnIndex) {
-            direction = currentSortDir === 'asc' ? 'desc' : 'asc';
-        }
-        table.dataset.sortCol = columnIndex;
-        table.dataset.sortDir = direction;
-
-        rows.sort((a, b) => {
-            const aText = a.cells[columnIndex].textContent.trim();
-            const bText = b.cells[columnIndex].textContent.trim();
-            const valA = parseValue(aText);
-            const valB = parseValue(bText);
-            let comparison = 0;
-            if (valA > valB) {
-                comparison = 1;
-            } else if (valA < valB) {
-                comparison = -1;
-            }
-            return direction === 'asc' ? comparison : -comparison;
-        });
-
-        tbody.innerHTML = '';
-        rows.forEach(row => tbody.appendChild(row));
-
-        table.querySelectorAll('th').forEach(th => {
-            th.classList.remove('sorted-asc', 'sorted-desc');
-        });
-        const headerToUpdate = table.querySelectorAll('th')[columnIndex];
-        if (headerToUpdate) {
-            headerToUpdate.classList.add(direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
-        }
-    }
-
-    function parseValue(val) {
-        if (val === 'N/A' || val === '--' || val === '---' || val === '') {
-            return -Infinity;
-        }
-        const cleanedVal = val.replace(/%|亿|万|元\/克|手/g, '').replace(/,/g, '');
-        const num = parseFloat(cleanedVal);
-        return isNaN(num) ? val.toLowerCase() : num;
-    }
-
-    function openTab(evt, tabId) {
-        // Hide all tab contents
-        const allContents = document.querySelectorAll('.tab-content');
-        allContents.forEach(content => {
-            content.classList.remove('active');
-        });
-
-        // Remove active class from all tab buttons
-        const allButtons = document.querySelectorAll('.tab-button');
-        allButtons.forEach(button => {
-            button.classList.remove('active');
-        });
-
-        // Show the clicked tab's content and add active class to the button
-        document.getElementById(tabId).classList.add('active');
-        evt.currentTarget.classList.add('active');
-    }
-
-    // Fund Operations Functions
-    // 板块分类数据
-    const SECTOR_CATEGORIES = {
-        "科技": ["人工智能", "半导体", "云计算", "5G", "光模块", "CPO", "F5G", "通信设备", "PCB", "消费电子",
-                "计算机", "软件开发", "信创", "网络安全", "IT服务", "国产软件", "计算机设备", "光通信",
-                "算力", "脑机接口", "通信", "电子", "光学光电子", "元件", "存储芯片", "第三代半导体",
-                "光刻胶", "电子化学品", "LED", "毫米波", "智能穿戴", "东数西算", "数据要素", "国资云",
-                "Web3.0", "AIGC", "AI应用", "AI手机", "AI眼镜", "DeepSeek", "TMT", "科技"],
-        "医药健康": ["医药生物", "医疗器械", "生物疫苗", "CRO", "创新药", "精准医疗", "医疗服务", "中药",
-                    "化学制药", "生物制品", "基因测序", "超级真菌"],
-        "消费": ["食品饮料", "白酒", "家用电器", "纺织服饰", "商贸零售", "新零售", "家居用品", "文娱用品",
-                "婴童", "养老产业", "体育", "教育", "在线教育", "社会服务", "轻工制造", "新消费",
-                "可选消费", "消费", "家电零部件", "智能家居"],
-        "金融": ["银行", "证券", "保险", "非银金融", "国有大型银行", "股份制银行", "城商行", "金融"],
-        "能源": ["新能源", "煤炭", "石油石化", "电力", "绿色电力", "氢能源", "储能", "锂电池", "电池",
-                "光伏设备", "风电设备", "充电桩", "固态电池", "能源", "煤炭开采", "公用事业", "锂矿"],
-        "工业制造": ["机械设备", "汽车", "新能源车", "工程机械", "高端装备", "电力设备", "专用设备",
-                    "通用设备", "自动化设备", "机器人", "人形机器人", "汽车零部件", "汽车服务",
-                    "汽车热管理", "尾气治理", "特斯拉", "无人驾驶", "智能驾驶", "电网设备", "电机",
-                    "高端制造", "工业4.0", "工业互联", "低空经济", "通用航空"],
-        "材料": ["有色金属", "黄金股", "贵金属", "基础化工", "钢铁", "建筑材料", "稀土永磁", "小金属",
-                "工业金属", "材料", "大宗商品", "资源"],
-        "军工": ["国防军工", "航天装备", "航空装备", "航海装备", "军工电子", "军民融合", "商业航天",
-                "卫星互联网", "航母", "航空机场"],
-        "基建地产": ["建筑装饰", "房地产", "房地产开发", "房地产服务", "交通运输", "物流"],
-        "环保": ["环保", "环保设备", "环境治理", "垃圾分类", "碳中和", "可控核聚变", "液冷"],
-        "传媒": ["传媒", "游戏", "影视", "元宇宙", "超清视频", "数字孪生"],
-        "主题": ["国企改革", "一带一路", "中特估", "中字头", "并购重组", "华为", "新兴产业",
-                "国家安防", "安全主题", "农牧主题", "农林牧渔", "养殖业", "猪肉", "高端装备"]
-    };
-
-    // 基金选择模态框相关变量
-    let currentOperation = null;
-    let selectedFundsForOperation = [];
-    let allFunds = [];
-
-    // 打开基金选择模态框
-    async function openFundSelectionModal(operation) {
-        currentOperation = operation;
-        selectedFundsForOperation = [];
-
-        // 设置标题
-        const titles = {
-            'hold': '选择要标记持有的基金',
-            'unhold': '选择要取消持有的基金',
-            'sector': '选择要标注板块的基金',
-            'unsector': '选择要删除板块的基金',
-            'delete': '选择要删除的基金'
-        };
-        document.getElementById('fundSelectionTitle').textContent = titles[operation] || '选择基金';
-
-        // 获取所有基金列表
-        try {
-            const response = await fetch('/api/fund/data');
-            const fundMap = await response.json();
-            allFunds = Object.entries(fundMap).map(([code, data]) => ({
-                code,
-                name: data.fund_name,
-                is_hold: data.is_hold,
-                sectors: data.sectors || []
-            }));
-
-            // 渲染基金列表
-            renderFundSelectionList(allFunds);
-
-            // 显示模态框
-            document.getElementById('fundSelectionModal').classList.add('active');
-        } catch (e) {
-            alert('获取基金列表失败: ' + e.message);
-        }
-    }
-
-    // 渲染基金选择列表
-    function renderFundSelectionList(funds) {
-        const listContainer = document.getElementById('fundSelectionList');
-
-        // HTML escape function to prevent XSS and syntax errors
-        const escapeHtml = (text) => {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        };
-
-        // Escape fund code for use in onclick attribute
-        const escapeJs = (text) => {
-            if (!text) return '';
-            return text.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        };
-
-        listContainer.innerHTML = funds.map(fund => {
-            const safeCode = escapeHtml(String(fund.code));
-            const safeName = escapeHtml(String(fund.name));
-            const safeCodeForJs = escapeJs(String(fund.code));
-            const safeSectors = fund.sectors && fund.sectors.length > 0
-                ? escapeHtml(fund.sectors.join(', '))
-                : '';
-
-            return `
-            <div class="sector-item" style="text-align: left; padding: 12px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px;"
-                 onclick="toggleFundSelection('${safeCodeForJs}', this)">
-                <input type="checkbox" class="fund-selection-checkbox" data-code="${safeCode}"
-                       style="width: 18px; height: 18px; cursor: pointer;" onclick="event.stopPropagation();">
-                <div style="flex: 1;">
-                    <div style="font-weight: 600;">${safeCode} - ${safeName}</div>
-                    ${fund.is_hold ? '<span style="color: #3b82f6; font-size: 12px;">⭐ 持有</span>' : ''}
-                    ${safeSectors ? `<span style="color: #8b949e; font-size: 12px;"> 🏷️ ${safeSectors}</span>` : ''}
-                </div>
-            </div>
-            `;
-        }).join('');
-    }
-
-    // 切换基金选择状态
-    function toggleFundSelection(code, element) {
-        const checkbox = element.querySelector('.fund-selection-checkbox');
-        checkbox.checked = !checkbox.checked;
-
-        if (checkbox.checked) {
-            if (!selectedFundsForOperation.includes(code)) {
-                selectedFundsForOperation.push(code);
-            }
-            element.style.backgroundColor = 'rgba(102, 126, 234, 0.2)';
-        } else {
-            selectedFundsForOperation = selectedFundsForOperation.filter(c => c !== code);
-            element.style.backgroundColor = '';
-        }
-    }
-
-    // 关闭基金选择模态框
-    function closeFundSelectionModal() {
-        document.getElementById('fundSelectionModal').classList.remove('active');
-        currentOperation = null;
-        selectedFundsForOperation = [];
-    }
-
-    // 确认基金选择
-    async function confirmFundSelection() {
-        if (selectedFundsForOperation.length === 0) {
-            alert('请至少选择一个基金');
-            return;
-        }
-
-        // 根据操作类型执行相应的操作
-        switch (currentOperation) {
-            case 'hold':
-                await markHold(selectedFundsForOperation);
-                break;
-            case 'unhold':
-                await unmarkHold(selectedFundsForOperation);
-                break;
-            case 'sector':
-                closeFundSelectionModal();
-                openSectorModal(selectedFundsForOperation);
-                return; // 不关闭，等待板块选择
-            case 'unsector':
-                await removeSector(selectedFundsForOperation);
-                break;
-            case 'delete':
-                await deleteFunds(selectedFundsForOperation);
-                break;
-        }
-
-        closeFundSelectionModal();
-    }
-
-    // 基金选择搜索
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('fundSelectionSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const keyword = this.value.toLowerCase();
-                const filtered = allFunds.filter(fund =>
-                    fund.code.includes(keyword) || fund.name.toLowerCase().includes(keyword)
-                );
-                renderFundSelectionList(filtered);
-            });
-        }
-    });
-
-    // 确认对话框相关函数
-    let confirmCallback = null;
-
-    function showConfirmDialog(title, message, onConfirm) {
-        document.getElementById('confirmTitle').textContent = title;
-        document.getElementById('confirmMessage').textContent = message;
-        document.getElementById('confirmDialog').classList.add('active');
-        confirmCallback = onConfirm;
-    }
-
-    function closeConfirmDialog() {
-        document.getElementById('confirmDialog').classList.remove('active');
-        confirmCallback = null;
-    }
-
-    document.getElementById('confirmBtn').addEventListener('click', function() {
-        if (confirmCallback) {
-            confirmCallback();
-        }
-        closeConfirmDialog();
-    });
-
-    // 添加基金
-    async function addFunds() {
-        const input = document.getElementById('fundCodesInput');
-        const codes = input.value.trim();
-        if (!codes) {
-            alert('请输入基金代码');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/fund/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ codes })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(result.message);
-                location.reload();
-            } else {
-                alert(result.message);
-            }
-        } catch (e) {
-            alert('操作失败: ' + e.message);
-        }
-    }
-
-    // 删除基金
-    async function deleteFunds(codes) {
-        showConfirmDialog(
-            '删除基金',
-            `确定要删除 ${codes.length} 只基金吗？`,
-            async () => {
-                try {
-                    const response = await fetch('/api/fund/delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ codes: codes.join(',') })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert(result.message);
-                        location.reload();
-                    } else {
-                        alert(result.message);
-                    }
-                } catch (e) {
-                    alert('操作失败: ' + e.message);
-                }
-            }
-        );
-    }
-
-    // 标记持有
-    async function markHold(codes) {
-        showConfirmDialog(
-            '标记持有',
-            `确定要标记 ${codes.length} 只基金为持有吗？`,
-            async () => {
-                try {
-                    const response = await fetch('/api/fund/hold', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ codes: codes.join(','), hold: true })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert(result.message);
-                        location.reload();
-                    } else {
-                        alert(result.message);
-                    }
-                } catch (e) {
-                    alert('操作失败: ' + e.message);
-                }
-            }
-        );
-    }
-
-    // 取消持有
-    async function unmarkHold(codes) {
-        showConfirmDialog(
-            '取消持有',
-            `确定要取消 ${codes.length} 只基金的持有标记吗？`,
-            async () => {
-                try {
-                    const response = await fetch('/api/fund/hold', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ codes: codes.join(','), hold: false })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert(result.message);
-                        location.reload();
-                    } else {
-                        alert(result.message);
-                    }
-                } catch (e) {
-                    alert('操作失败: ' + e.message);
-                }
-            }
-        );
-    }
-
-    // 打开板块选择模态框（用于标注板块）
-    let selectedCodesForSector = [];
-
-    function openSectorModal(codes) {
-        selectedCodesForSector = codes;
-        document.getElementById('sectorModal').classList.add('active');
-        renderSectorCategories();
-    }
-
-    // 删除板块标记
-    async function removeSector(codes) {
-        showConfirmDialog(
-            '删除板块标记',
-            `确定要删除 ${codes.length} 只基金的板块标记吗？`,
-            async () => {
-                try {
-                    const response = await fetch('/api/fund/sector/remove', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ codes: codes.join(',') })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert(result.message);
-                        location.reload();
-                    } else {
-                        alert(result.message);
-                    }
-                } catch (e) {
-                    alert('操作失败: ' + e.message);
-                }
-            }
-        );
-    }
-
-    // 取消持有
-    async function unmarkHold() {
-        const codes = getSelectedCodes();
-        if (codes.length === 0) {
-            alert('请先选择要取消持有的基金');
-            return;
-        }
-
-        showConfirmDialog(
-            '取消持有',
-            `确定要取消 ${codes.length} 只基金的持有标记吗？`,
-            async () => {
-                try {
-                    const response = await fetch('/api/fund/hold', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ codes: codes.join(','), hold: false })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert(result.message);
-                        location.reload();
-                    } else {
-                        alert(result.message);
-                    }
-                } catch (e) {
-                    alert('操作失败: ' + e.message);
-                }
-            }
-        );
-    }
-
-    // 板块选择相关
-    let selectedSectors = [];
-
-    function renderSectorCategories() {
-        // 生成板块分类HTML
-        const container = document.getElementById('sectorCategories');
-        container.innerHTML = '';
-
-        for (const [category, sectors] of Object.entries(SECTOR_CATEGORIES)) {
-            const categoryDiv = document.createElement('div');
-            categoryDiv.className = 'sector-category';
-
-            const header = document.createElement('div');
-            header.className = 'sector-category-header';
-            header.innerHTML = `<span>${category}</span><span>▼</span>`;
-            header.onclick = () => {
-                const items = categoryDiv.querySelector('.sector-items');
-                items.style.display = items.style.display === 'none' ? 'grid' : 'none';
-            };
-
-            const itemsDiv = document.createElement('div');
-            itemsDiv.className = 'sector-items';
-
-            sectors.forEach(sector => {
-                const item = document.createElement('div');
-                item.className = 'sector-item';
-                item.textContent = sector;
-                item.onclick = () => {
-                    item.classList.toggle('selected');
-                    if (item.classList.contains('selected')) {
-                        if (!selectedSectors.includes(sector)) {
-                            selectedSectors.push(sector);
-                        }
-                    } else {
-                        selectedSectors = selectedSectors.filter(s => s !== sector);
-                    }
-                };
-                itemsDiv.appendChild(item);
-            });
-
-            categoryDiv.appendChild(header);
-            categoryDiv.appendChild(itemsDiv);
-            container.appendChild(categoryDiv);
-        }
-
-        selectedSectors = [];
-        document.getElementById('sectorModal').classList.add('active');
-    }
-
-    function closeSectorModal() {
-        document.getElementById('sectorModal').classList.remove('active');
-        selectedSectors = [];
-    }
-
-    async function confirmSector() {
-        if (selectedSectors.length === 0) {
-            alert('请至少选择一个板块');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/fund/sector', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ codes: selectedCodesForSector.join(','), sectors: selectedSectors })
-            });
-            const result = await response.json();
-            closeSectorModal();
-            if (result.success) {
-                alert(result.message);
-                location.reload();
-            } else {
-                alert(result.message);
-            }
-        } catch (e) {
-            closeSectorModal();
-            alert('操作失败: ' + e.message);
-        }
-    }
-
-    // ==================== 新增功能：份额管理和文件操作 ====================
-
-    // 当前正在编辑份额的基金代码
-    let currentSharesFundCode = null;
-
-    // 获取基金份额（从内存或DOM）- 必须在 openSharesModal 之前定义
-    window.getFundShares = function(fundCode) {
-        // 先从全局存储获取
-        if (window.fundSharesData && window.fundSharesData[fundCode]) {
-            return window.fundSharesData[fundCode];
-        }
-        return 0;
-    };
-
-    // 更新份额按钮状态 - 必须在 openSharesModal 之前定义
-    function updateSharesButton(fundCode, shares) {
-        const button = document.getElementById('sharesBtn_' + fundCode);
-        if (button) {
-            button.textContent = '修改';
-            if (shares > 0) {
-                button.style.background = '#10b981';
-            } else {
-                button.style.background = '#3b82f6';
-            }
-        }
-    }
-
-    // 打开份额设置弹窗
-    window.openSharesModal = function(fundCode) {
-        currentSharesFundCode = fundCode;
-        const modal = document.getElementById('sharesModal');
-        const fundCodeDisplay = document.getElementById('sharesModalFundCode');
-        const sharesInput = document.getElementById('sharesModalInput');
-        if (!modal || !sharesInput) return;
-
-        // 获取当前份额
-        const sharesValue = window.getFundShares(fundCode) || 0;
-        sharesInput.value = sharesValue > 0 ? sharesValue : '';
-        if (fundCodeDisplay) {
-            fundCodeDisplay.textContent = fundCode;
-        }
-
-        // 更新弹窗标题
-        const header = modal.querySelector('.sector-modal-header');
-        if (header) {
-            header.textContent = '修改持仓';
-        }
-
-        modal.classList.add('active');
-        setTimeout(() => sharesInput.focus(), 100);
-    };
-
-    // 关闭份额设置弹窗
-    window.closeSharesModal = function() {
-        const modal = document.getElementById('sharesModal');
-        modal.classList.remove('active');
-        currentSharesFundCode = null;
-    };
-
-    // 确认份额设置
-    window.confirmShares = async function() {
-        if (!currentSharesFundCode) {
-            alert('基金代码无效');
-            return;
-        }
-
-        const sharesInput = document.getElementById('sharesModalInput');
-        const shares = parseFloat(sharesInput.value) || 0;
-
-        if (shares < 0) {
-            alert('份额不能为负数');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/fund/shares', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: currentSharesFundCode, shares: shares })
-            });
-            const result = await response.json();
-            if (result.success) {
-                // 更新全局份额数据
-                if (!window.fundSharesData) {
-                    window.fundSharesData = {};
-                }
-                window.fundSharesData[currentSharesFundCode] = shares;
-
-                // 更新按钮文本
-                updateSharesButton(currentSharesFundCode, shares);
-                // 重新计算持仓统计
-                calculatePositionSummary();
-                // 关闭弹窗
-                closeSharesModal();
-            } else {
-                alert(result.message);
-            }
-        } catch (e) {
-            alert('更新份额失败: ' + e.message);
-        }
-    };
-
-    // 下载fund_map.json
-    window.updateShares = async function(fundCode, shares) {
-        if (!fundCode) {
-            alert('基金代码无效');
-            return;
-        }
-
-        try {
-            const sharesValue = parseFloat(shares) || 0;
-            const response = await fetch('/api/fund/shares', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: fundCode, shares: sharesValue })
-            });
-            const result = await response.json();
-            if (result.success) {
-                // 更新全局份额数据
-                if (!window.fundSharesData) {
-                    window.fundSharesData = {};
-                }
-                window.fundSharesData[fundCode] = sharesValue;
-
-                // 更新按钮状态
-                updateSharesButton(fundCode, sharesValue);
-                // 更新成功后重新计算持仓统计
-                calculatePositionSummary();
-            } else {
-                alert(result.message);
-            }
-        } catch (e) {
-            alert('更新份额失败: ' + e.message);
-        }
-    };
-
-    // 下载fund_map.json
-    window.downloadFundMap = function() {
-        window.location.href = '/api/fund/download';
-    };
-
-    // 上传fund_map.json
-    window.uploadFundMap = async function(file) {
-        if (!file) {
-            alert('请选择文件');
-            return;
-        }
-
-        if (!file.name.endsWith('.json')) {
-            alert('只支持JSON文件');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await fetch('/api/fund/upload', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(result.message);
-                location.reload();
-            } else {
-                alert(result.message);
-            }
-        } catch (e) {
-            alert('上传失败: ' + e.message);
-        }
-    };
-
-    // 计算并显示持仓统计
-    async function calculatePositionSummary() {
-        let totalValue = 0;
-        let estimatedGain = 0;
-        let actualGain = 0;
-        let settledValue = 0;
-        const today = new Date().toISOString().split('T')[0];
-
-        // Get fund data map for holdings cards
-        let fundDataMap = {};
-        try {
-            const response = await fetch('/api/fund/data');
-            if (response.ok) {
-                fundDataMap = await response.json();
-            }
-        } catch (e) {
-            console.warn('Failed to fetch fund data map:', e);
-        }
-
-        // Collect held funds data for cards
-        const heldFundsData = [];
-        // Collect fund details for summary table
-        const fundDetailsData = [];
-
-        // 遍历所有基金行
-        const fundRows = document.querySelectorAll('.style-table tbody tr');
-        fundRows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length < 9) return;
-
-            // 获取基金代码
-            const codeCell = cells[1]; // 第二列是基金代码（第一列是复选框）
-            const fundCode = codeCell.textContent.trim();
-
-            // Check if this fund is held
-            const isHeld = fundDataMap[fundCode]?.is_hold || false;
-
-            // 获取份额数据（从全局数据对象）
-            const shares = window.fundSharesData && window.fundSharesData[fundCode] ? parseFloat(window.fundSharesData[fundCode]) : 0;
-            if (shares <= 0) return;  // 只处理有份额的基金
-
-            try {
-                // 解析净值 "1.234(2025-02-02)"
-                const netValueText = cells[4].textContent.trim();
-                const netValueMatch = netValueText.match(/([0-9.]+)\(([0-9-]+)\)/);
-                if (!netValueMatch) return;
-
-                const netValue = parseFloat(netValueMatch[1]);
-                let netValueDate = netValueMatch[2];
-
-                // 处理净值日期格式：API可能返回"MM-DD"或"YYYY-MM-DD"
-                // 如果是"MM-DD"格式，添加当前年份
-                if (netValueDate.length === 5) {  // 格式为"MM-DD"
-                    const currentYear = new Date().getFullYear();
-                    netValueDate = `${currentYear}-${netValueDate}`;
-                }
-
-                // 解析估值增长率
-                const estimatedGrowthText = cells[5].textContent.trim();
-                const estimatedGrowth = estimatedGrowthText !== 'N/A' ?
-                    parseFloat(estimatedGrowthText.replace('%', '')) : 0;
-
-                // 解析日涨幅
-                const dayGrowthText = cells[6].textContent.trim();
-                const dayGrowth = dayGrowthText !== 'N/A' ?
-                    parseFloat(dayGrowthText.replace('%', '')) : 0;
-
-                // 解析连涨/跌
-                const consecutiveText = cells[7].textContent.trim();
-
-                // 解析近30天
-                const monthlyText = cells[8].textContent.trim();
-
-                // 计算持仓市值
-                const positionValue = shares * netValue;
-
-                // If this fund is held, collect its data for cards
-                if (isHeld) {
-                    heldFundsData.push({
-                        code: fundCode,
-                        name: fundDataMap[fundCode]?.fund_name || 'Unknown',
-                        sectors: fundDataMap[fundCode]?.sectors || [],
-                        netValue: netValue,
-                        netValueDate: netValueDate,
-                        estimatedGrowth: estimatedGrowth,
-                        dayGrowth: dayGrowth,
-                        consecutive: consecutiveText,
-                        monthly: monthlyText,
-                        shares: shares,
-                        positionValue: positionValue
-                    });
-                }
-
-                if (shares > 0) {
-                    totalValue += positionValue;
-
-                    // 计算预估涨跌
-                    const fundEstimatedGain = positionValue * estimatedGrowth / 100;
-                    estimatedGain += fundEstimatedGain;
-
-                    // 计算实际涨跌（仅当日结算）
-                    let fundActualGain = 0;
-                    if (netValueDate === today) {
-                        fundActualGain = positionValue * dayGrowth / 100;
-                        actualGain += fundActualGain;
-                        settledValue += positionValue;
-                    }
-
-                    // Collect fund details for summary table
-                    const fundName = cells[2].textContent.trim();
-                    fundDetailsData.push({
-                        code: fundCode,
-                        name: fundName,
-                        shares: shares,
-                        positionValue: positionValue,
-                        estimatedGain: fundEstimatedGain,
-                        estimatedGainPct: estimatedGrowth,
-                        actualGain: fundActualGain,
-                        actualGainPct: netValueDate === today ? dayGrowth : 0
-                    });
-                }
-            } catch (e) {
-                console.warn('解析基金数据失败:', fundCode, e);
-            }
-        });
-
-        // Update Asset Hero Section
-        const assetHero = document.getElementById('assetHero');
-        if (assetHero) {
-            if (totalValue > 0) {
-                assetHero.style.display = 'block';
-
-            // Update total value
-            document.getElementById('heroTotalValue').textContent =
-                totalValue.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-
-            // Update estimated gain
-            const estGainPct = totalValue > 0 ? (estimatedGain / totalValue * 100) : 0;
-            const estSign = estimatedGain >= 0 ? '+' : '';
-            const estClass = estimatedGain >= 0 ? 'positive' : 'negative';
-            document.getElementById('heroEstimatedGain').textContent =
-                estSign + Math.abs(estimatedGain).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            document.getElementById('heroEstimatedGain').className = 'asset-metric-value ' + estClass;
-            document.getElementById('heroEstimatedGainPct').textContent = estSign + estGainPct.toFixed(2) + '%';
-
-            // Update actual gain
-            if (settledValue > 0) {
-                const actGainPct = (actualGain / settledValue * 100);
-                const actSign = actualGain >= 0 ? '+' : '';
-                const actClass = actualGain >= 0 ? 'positive' : 'negative';
-                document.getElementById('heroActualGain').textContent =
-                    actSign + Math.abs(actualGain).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                document.getElementById('heroActualGain').className = 'asset-metric-value ' + actClass;
-                document.getElementById('heroActualGainPct').textContent = actSign + actGainPct.toFixed(2) + '% (Settled)';
-            } else {
-                document.getElementById('heroActualGain').textContent = '0.00';
-                document.getElementById('heroActualGain').className = 'asset-metric-value neutral';
-                document.getElementById('heroActualGainPct').textContent = '0.00% (Settled)';
-            }
-            } else {
-                assetHero.style.display = 'none';
-            }
-        }
-
-        // Generate and populate holdings cards
-        if (heldFundsData.length > 0) {
-            const cardsHTML = heldFundsData.map(fund => {
-                const sectorTags = fund.sectors && fund.sectors.length > 0
-                    ? `<span style="color: #8b949e; font-size: 12px;"> 🏷️ ${fund.sectors.join(', ')}</span>`
-                    : '';
-                const estClass = fund.estimatedGrowth >= 0 ? 'up' : 'down';
-                const dayClass = fund.dayGrowth >= 0 ? 'up' : 'down';
-
-                return `
-                <div class="fund-glass-card" data-code="${fund.code}">
-                    <div class="card-header">
-                        <div>
-                            <div class="card-title">${fund.name}</div>
-                            <div class="card-code">${fund.code} ${sectorTags}</div>
-                        </div>
-                        <div class="card-badge">⭐</div>
-                    </div>
-                    <div class="card-main-data">
-                        <span class="est-pct ${estClass}">${fund.estimatedGrowth >= 0 ? '+' : ''}${fund.estimatedGrowth.toFixed(2)}%</span>
-                        <span style="font-size: 12px; color: var(--text-dim)">实时估值</span>
-                    </div>
-                    <div class="card-details">
-                        <div class="detail-item">持仓份额 <b>${fund.shares.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</b></div>
-                        <div class="detail-item">估值盈亏 <b class="${estClass}">${fund.estimatedGrowth >= 0 ? '+' : '-'}${Math.abs(fund.positionValue * fund.estimatedGrowth / 100).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</b></div>
-                        <div class="detail-item">当前净值 <b>${fund.netValue.toFixed(4)}</b></div>
-                        <div class="detail-item">日涨幅 <b class="${dayClass}">${fund.dayGrowth >= 0 ? '+' : ''}${fund.dayGrowth.toFixed(2)}%</b></div>
-                    </div>
-                </div>
-                `;
-            }).join('');
-
-            const holdingsSection = `
-            <div style="margin-bottom: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <div style="font-size: 18px; font-weight: 600; color: var(--text-main);">💎 核心持仓</div>
-                    <div style="font-size: 14px; color: var(--text-dim); font-family: var(--font-mono);">${heldFundsData.length} 只</div>
-                </div>
-                <div class="holdings-grid">
-                    ${cardsHTML}
-                </div>
-            </div>
-            `;
-
-            document.getElementById('holdingsCardsContainer').innerHTML = holdingsSection;
-        } else {
-            document.getElementById('holdingsCardsContainer').innerHTML = '';
-        }
-
-        // 显示或隐藏持仓统计区域
-        const summaryDiv = document.getElementById('positionSummary');
-        const fundDetailsDiv = document.getElementById('fundDetailsSummary');
-        if (!summaryDiv) {
-            // positionSummary element not found (sidebar layout), skip old layout summary
-            console.log('positionSummary element not found - using sidebar layout');
-        } else if (totalValue > 0) {
-            summaryDiv.style.display = 'block';
-
-            // 更新总持仓金额
-            const totalValueEl = document.getElementById('totalValue');
-            if (totalValueEl) {
-                totalValueEl.textContent =
-                    totalValue.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            }
-
-            // 更新预估涨跌
-            const estGainPct = totalValue > 0 ? (estimatedGain / totalValue * 100) : 0;
-            const estColor = estimatedGain >= 0 ? '#ef4444' : '#10b981';
-            const estimatedGainEl = document.getElementById('estimatedGain');
-            if (estimatedGainEl) {
-                estimatedGainEl.innerHTML =
-                    `<span class="sensitive-value ${estimatedGain >= 0 ? 'positive' : 'negative'}" style="color: ${estColor}"><span class="real-value">${estimatedGain >= 0 ? '+' : '-'}${Math.abs(estimatedGain).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span><span class="hidden-value">****</span></span><span id="estimatedGainPct" style="color: ${estColor}"> (${estGainPct.toFixed(2)}%)</span>`;
-            }
-
-            // 更新实际涨跌
-            const actualGainEl = document.getElementById('actualGain');
-            if (actualGainEl) {
-                if (settledValue > 0) {
-                    const actGainPct = (actualGain / settledValue * 100);
-                    const actColor = actualGain >= 0 ? '#ef4444' : '#10b981';
-                    actualGainEl.innerHTML =
-                        `<span class="sensitive-value ${actualGain >= 0 ? 'positive' : 'negative'}" style="color: ${actColor}"><span class="real-value">${actualGain >= 0 ? '+' : '-'}${Math.abs(actualGain).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span><span class="hidden-value">****</span></span><span id="actualGainPct" style="color: ${actColor}"> (${actGainPct.toFixed(2)}%)</span>`;
-                } else {
-                    actualGainEl.innerHTML =
-                        '<span style="color: var(--text-dim);">净值未更新</span>';
-                }
-            }
-
-            // 填充分基金明细表格
-            if (fundDetailsDiv && fundDetailsData.length > 0) {
-                fundDetailsDiv.style.display = 'block';
-                const tableBody = document.getElementById('fundDetailsTableBody');
-                if (tableBody) {
-                    tableBody.innerHTML = fundDetailsData.map(fund => {
-                        const estColor = fund.estimatedGain >= 0 ? '#f44336' : '#4caf50';
-                        const actColor = fund.actualGain >= 0 ? '#f44336' : '#4caf50';
-                        return `
-                            <tr style="border-bottom: 1px solid var(--border);">
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; color: var(--accent); font-weight: 500;">${fund.code}</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; color: var(--text-main); min-width: 120px;">${fund.name}</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; font-family: var(--font-mono);">${fund.shares.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; font-family: var(--font-mono); font-weight: 600;">${fund.positionValue.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; font-family: var(--font-mono); color: ${estColor}; font-weight: 500;">${fund.estimatedGain >= 0 ? '+' : '-'}${Math.abs(fund.estimatedGain).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; font-family: var(--font-mono); color: ${estColor}; font-weight: 500;">${fund.estimatedGainPct.toFixed(2)}%</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; font-family: var(--font-mono); color: ${actColor}; font-weight: 500;">${fund.actualGain >= 0 ? '+' : '-'}${Math.abs(fund.actualGain).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td style="padding: 10px; text-align: center; white-space: nowrap; vertical-align: middle; font-family: var(--font-mono); color: ${actColor}; font-weight: 500;">${fund.actualGainPct.toFixed(2)}%</td>
-                            </tr>
-                        `;
-                    }).join('');
-                }
-            } else if (fundDetailsDiv) {
-                fundDetailsDiv.style.display = 'none';
-            }
-        } else {
-            summaryDiv.style.display = 'none';
-            if (fundDetailsDiv) {
-                fundDetailsDiv.style.display = 'none';
-            }
-        }
-    }
-
-    // 页面加载时加载份额数据并计算持仓统计
-    async function loadSharesData() {
-        try {
-            // 从后端API获取用户的基金数据（包含份额）
-            const response = await fetch('/api/fund/data');
-            if (response.ok) {
-                const fundData = await response.json();
-
-                // 存储份额数据到全局变量
-                window.fundSharesData = {};
-
-                // 先存储数据，稍后更新按钮
-                for (const [code, data] of Object.entries(fundData)) {
-                    const shares = parseFloat(data.shares) || 0;
-                    window.fundSharesData[code] = shares;
-                }
-
-                // 等待DOM加载完成后更新按钮状态
-                updateAllSharesButtons();
-
-                // 计算持仓统计
-                calculatePositionSummary();
-            }
-        } catch (e) {
-            console.error('加载份额数据失败:', e);
-            // 即使加载失败，也尝试计算持仓统计
-            calculatePositionSummary();
-        }
-    }
-
-    // 更新所有份额按钮状态（在DOM加载后调用）
-    function updateAllSharesButtons() {
-        if (!window.fundSharesData) return;
-
-        for (const [code, shares] of Object.entries(window.fundSharesData)) {
-            updateSharesButton(code, shares);
-        }
-    }
-
-    // 板块搜索功能
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('sectorSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const keyword = this.value.toLowerCase();
-                const categories = document.querySelectorAll('.sector-category');
-
-                categories.forEach(category => {
-                    const items = category.querySelectorAll('.sector-item');
-                    let hasVisible = false;
-
-                    items.forEach(item => {
-                        const text = item.textContent.toLowerCase();
-                        if (text.includes(keyword)) {
-                            item.style.display = 'block';
-                            hasVisible = true;
-                        } else {
-                            item.style.display = 'none';
-                        }
-                    });
-
-                    category.style.display = hasVisible || keyword === '' ? 'block' : 'none';
-                });
-            });
-        }
-
-        // 初始化 - 加载份额数据
-        loadSharesData();
-
-        // 份额弹窗 - 点击外部关闭
-        const sharesModal = document.getElementById('sharesModal');
-        if (sharesModal) {
-            sharesModal.addEventListener('click', function(e) {
-                if (e.target === sharesModal) {
-                    closeSharesModal();
-                }
-            });
-
-            // 份额弹窗 - 回车键确认
-            const sharesInput = document.getElementById('sharesModalInput');
-            if (sharesInput) {
-                sharesInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        confirmShares();
-                    }
-                });
-            }
-        }
-    });
-    </script>
-    """
+    """Deprecated legacy inline JS. Use /static/js/main.js instead."""
+    return ""
 
 
 # ==================== 新页面布局函数 ====================
@@ -4866,6 +3740,7 @@ def get_portfolio_page_html(fund_content, fund_map, fund_chart_data=None, fund_c
     fund_chart_data_json = json.dumps(
         fund_chart_data if fund_chart_data else {'labels': [], 'growth': [], 'net_values': []})
     fund_chart_info_json = json.dumps(fund_chart_info if fund_chart_info else {})
+    modal_html = get_shared_modal_html(include_fund_chart_selector=True)
 
     html = '''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -5356,107 +4231,7 @@ def get_portfolio_page_html(fund_content, fund_map, fund_chart_data=None, fund_c
         </div>
     </div>
 
-    <!-- Modals (复用现有模态框) -->
-    <div class="sector-modal" id="sectorModal">
-        <div class="sector-modal-content">
-            <div class="sector-modal-header">选择板块</div>
-            <input type="text" class="sector-modal-search" id="sectorSearch" placeholder="搜索板块名称...">
-            <div id="sectorCategories"></div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeSectorModal()">取消</button>
-                <button class="btn btn-primary" onclick="confirmSector()">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="sector-modal" id="fundSelectionModal">
-        <div class="sector-modal-content">
-            <div class="sector-modal-header" id="fundSelectionTitle">选择基金</div>
-            <input type="text" class="sector-modal-search" id="fundSelectionSearch" placeholder="搜索基金代码或名称...">
-            <div id="fundSelectionList" style="max-height: 400px; overflow-y: auto;"></div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeFundSelectionModal()">取消</button>
-                <button class="btn btn-primary" id="fundSelectionConfirmBtn" onclick="confirmFundSelection()">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="confirm-dialog" id="confirmDialog">
-        <div class="confirm-dialog-content">
-            <h3 id="confirmTitle" class="confirm-title"></h3>
-            <p id="confirmMessage" class="confirm-message"></p>
-            <div class="confirm-actions">
-                <button class="btn btn-secondary" onclick="closeConfirmDialog()">取消</button>
-                <button class="btn btn-primary" id="confirmBtn">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 基金图表选择模态框 -->
-    <div class="sector-modal" id="fundChartSelectorModal">
-        <div class="sector-modal-content" style="max-width: 500px;">
-            <div class="sector-modal-header">选择基金</div>
-            <input type="text" class="sector-modal-search" id="fundChartSelectorSearch" placeholder="搜索基金代码或名称...">
-            <div id="fundChartSelectorList" style="max-height: 400px; overflow-y: auto;">
-                <!-- 基金列表将通过JS动态生成 -->
-            </div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeFundChartSelectorModal()">取消</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 持仓设置弹窗 -->
-    <div class="sector-modal" id="sharesModal">
-        <div class="sector-modal-content" style="max-width: 460px;">
-            <div class="sector-modal-header">修改持仓</div>
-            <div style="padding: 20px;">
-                <div style="margin-bottom: 12px;">
-                    <label style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">最新净值（日期）</label>
-                    <div id="sharesModalNetInfo" style="padding: 10px; background: rgba(30, 41, 59, 0.45); border-radius: 6px; color: var(--text-main);">--</div>
-                </div>
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-                    <button id="sharesModalModeBtn" class="btn btn-secondary" onclick="toggleHoldingInputMode()">转换为份额输入</button>
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalAmountInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有金额</label>
-                    <input type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持仓份额</label>
-                    <input type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalProfitInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有收益</label>
-                    <input type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label for="sharesModalDaysInput" style="display: block; margin-bottom: 8px; color: var(--text-main); font-weight: 500;">持有天数</label>
-                    <input type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数"
-                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text-main);">
-                </div>
-                <div id="sharesModalSharesPreview" style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: var(--text-main); font-size: 13px;">
-                    换算份额：0.00 份 | 当前持仓市值：0.00
-                </div>
-                <div style="margin-top: 8px; font-size: 12px; color: var(--text-dim);">
-                    说明：金额和份额会按当前净值双向换算，保存时以份额为准。
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px;">
-                    <button class="btn btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.35);" onclick="openHoldingSyncAction('buy')">同步加仓</button>
-                    <button class="btn btn-secondary" style="color: #10b981; border-color: rgba(16,185,129,0.35);" onclick="openHoldingSyncAction('sell')">同步减仓</button>
-                    <button class="btn btn-secondary" style="color: #3b82f6; border-color: rgba(59,130,246,0.35);" onclick="openHoldingSyncAction('dca')">同步定投</button>
-                    <button class="btn btn-secondary" style="color: #6366f1; border-color: rgba(99,102,241,0.35);" onclick="openHoldingSyncAction('convert')">同步转换</button>
-                </div>
-            </div>
-            <div class="sector-modal-footer">
-                <button class="btn btn-secondary" onclick="closeSharesModal()">取消</button>
-                <button class="btn btn-primary" onclick="confirmShares()">确定</button>
-            </div>
-        </div>
-    </div>
+    {modal_html}
 
     <script src="/static/js/main.js"></script>
     <script>
@@ -5557,7 +4332,11 @@ def get_portfolio_page_html(fund_content, fund_map, fund_chart_data=None, fund_c
             // 点击输入框打开模态框
             const openModal = () => {{
                 renderFundChartSelectorList(fundChartSelectorFunds);
-                document.getElementById('fundChartSelectorModal').classList.add('active');
+                if (typeof openOverlay === 'function') {{
+                    openOverlay('fundChartSelectorModal');
+                }} else {{
+                    document.getElementById('fundChartSelectorModal').classList.add('active');
+                }}
                 setTimeout(() => {{
                     const searchInput = document.getElementById('fundChartSelectorSearch');
                     if (searchInput) searchInput.focus();
@@ -5627,11 +4406,16 @@ def get_portfolio_page_html(fund_content, fund_map, fund_chart_data=None, fund_c
         // 关闭模态框
         function closeFundChartSelectorModal() {{
             const modal = document.getElementById('fundChartSelectorModal');
-            if (modal) modal.classList.remove('active');
+            if (typeof closeOverlay === 'function') {{
+                closeOverlay('fundChartSelectorModal');
+            }} else if (modal) {{
+                modal.classList.remove('active');
+            }}
 
             const searchInput = document.getElementById('fundChartSelectorSearch');
             if (searchInput) searchInput.value = '';
         }}
+        window.closeFundChartSelectorModal = closeFundChartSelectorModal;
 
         // 搜索功能和模态框事件
         document.addEventListener('DOMContentLoaded', function() {{
@@ -5828,7 +4612,8 @@ def get_portfolio_page_html(fund_content, fund_map, fund_chart_data=None, fund_c
     </script>
 </body>
 </html>'''.format(css_style=css_style, username_display=username_display, fund_content=fund_content,
-                  fund_chart_data_json=fund_chart_data_json, fund_chart_info_json=fund_chart_info_json)
+                  fund_chart_data_json=fund_chart_data_json, fund_chart_info_json=fund_chart_info_json,
+                  modal_html=modal_html)
     return html
 
 
