@@ -3125,3 +3125,114 @@ body::before {
         animation-iteration-count: 1 !important;
     }
 }
+
+/* ============================================================
+   33. Unified Chart System
+   ============================================================ */
+:root {
+    --chart-axis: #607193;
+    --chart-axis-strong: #415069;
+    --chart-grid: rgba(99, 116, 145, 0.16);
+    --chart-zero-line: rgba(71, 85, 105, 0.55);
+    --chart-tooltip-bg: rgba(15, 23, 42, 0.92);
+    --chart-tooltip-border: rgba(148, 163, 184, 0.32);
+    --chart-tooltip-text: #f8fafc;
+    --chart-up: #e0314d;
+    --chart-down: #0b8b74;
+    --chart-neutral: #7a879d;
+}
+
+.app-layout-topnav .chart-card-header {
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.chart-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.chart-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 11px;
+    border: 1px solid rgba(96, 113, 147, 0.26);
+    background: rgba(241, 246, 255, 0.7);
+}
+
+.chart-range-btn {
+    border: 0;
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 600;
+    color: #5f6f8d;
+    background: transparent;
+    cursor: pointer;
+    transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.chart-range-btn:hover {
+    color: #2d3f5f;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.chart-range-btn.active {
+    color: #1f2f45;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 1px 4px rgba(56, 72, 109, 0.18);
+}
+
+.chart-title-meta {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.01em;
+}
+
+.chart-title-meta.up {
+    color: var(--chart-up);
+}
+
+.chart-title-meta.down {
+    color: var(--chart-down);
+}
+
+.chart-title-meta.flat {
+    color: var(--chart-neutral);
+}
+
+.app-layout-topnav .chart-canvas-wrap {
+    height: clamp(240px, 44vh, 390px);
+    min-height: 220px;
+}
+
+@media (max-width: 768px) {
+    .chart-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .chart-selector {
+        min-width: 100%;
+    }
+
+    .chart-range {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .app-layout-topnav .chart-canvas-wrap {
+        height: clamp(220px, 36vh, 320px);
+    }
+}

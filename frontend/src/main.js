@@ -1,3 +1,15 @@
+import {
+  buildLineChartOptions,
+  buildLineDataset,
+  buildRangeButtonsHtml,
+  createOrUpdateLineChart,
+  formatPrice,
+  formatSigned,
+  normalizeRangeValue,
+  sliceByRange,
+  toNumberSeries
+} from './charts/factory.js';
+
 const SECTION_META = {
   news: { tabId: 'kx', title: '7*24快讯', showSummary: false, showHeader: false },
   indices: { tabId: 'marker', title: '全球指数', showSummary: false, showHeader: false },
@@ -42,6 +54,43 @@ const FLOATING_REFRESH_BOTTOM_GAP = 16;
 const loadedTabs = new Set();
 const pendingLoads = new Map();
 const chartInstances = {
+  timing: null,
+  goldOneDay: null,
+  goldHistory: null,
+  fund: null
+};
+const CHART_RANGE_PRESETS = {
+  timing: [
+    { value: '60', label: '1H', count: 60 },
+    { value: '120', label: '2H', count: 120 },
+    { value: '240', label: '4H', count: 240 },
+    { value: 'all', label: '全部', count: 0 }
+  ],
+  goldOneDay: [
+    { value: '60', label: '1H', count: 60 },
+    { value: '180', label: '3H', count: 180 },
+    { value: 'all', label: '全部', count: 0 }
+  ],
+  goldHistory: [
+    { value: '30', label: '30D', count: 30 },
+    { value: '90', label: '90D', count: 90 },
+    { value: '180', label: '180D', count: 180 },
+    { value: 'all', label: '全部', count: 0 }
+  ],
+  fund: [
+    { value: '30', label: '30', count: 30 },
+    { value: '60', label: '60', count: 60 },
+    { value: '120', label: '120', count: 120 },
+    { value: 'all', label: '全部', count: 0 }
+  ]
+};
+const chartRangeState = {
+  timing: '240',
+  goldOneDay: '180',
+  goldHistory: '90',
+  fund: '120'
+};
+const chartDataCache = {
   timing: null,
   goldOneDay: null,
   goldHistory: null,
@@ -725,19 +774,108 @@ function isChartReusable(key, canvas) {
   return Boolean(chartInstances[key] && chartInstances[key].canvas === canvas);
 }
 
-function updateTimingChartTitle(latestPct, latestPrice) {
-  const title = document.getElementById('timingChartTitle');
+function getRangePresets(chartKey) {
+  return CHART_RANGE_PRESETS[chartKey] || [{ value: 'all', label: '全部', count: 0 }];
+}
+
+function getChartRange(chartKey) {
+  const presets = getRangePresets(chartKey);
+  chartRangeState[chartKey] = normalizeRangeValue(chartRangeState[chartKey], presets, 'all');
+  return chartRangeState[chartKey];
+}
+
+function setChartRange(chartKey, rangeValue) {
+  const presets = getRangePresets(chartKey);
+  chartRangeState[chartKey] = normalizeRangeValue(rangeValue, presets, 'all');
+}
+
+function getChartRangeControls(chartKey) {
+  return buildRangeButtonsHtml(chartKey, getRangePresets(chartKey), getChartRange(chartKey));
+}
+
+function syncChartRangeButtons(chartKey, root = document) {
+  const selected = getChartRange(chartKey);
+  root.querySelectorAll(`.chart-range[data-chart-key="${chartKey}"] .chart-range-btn`).forEach((button) => {
+    button.classList.toggle('active', button.dataset.range === selected);
+  });
+}
+
+function syncAllChartRangeButtons(root = document) {
+  Object.keys(CHART_RANGE_PRESETS).forEach((chartKey) => {
+    syncChartRangeButtons(chartKey, root);
+  });
+}
+
+function updateChartTitle(titleId, baseTitle, metaText, trendValue = 0) {
+  const title = document.getElementById(titleId);
   if (!title) {
     return;
   }
-  const color = latestPct >= 0 ? '#f44336' : '#4caf50';
-  title.style.color = color;
-  title.innerHTML = `上证分时 <span style="font-size: 0.9em;">${latestPct >= 0 ? '+' : ''}${latestPct.toFixed(2)}% (${latestPrice.toFixed(2)})</span>`;
+
+  const trendClass = trendValue > 0 ? 'up' : (trendValue < 0 ? 'down' : 'flat');
+  const meta = metaText ? ` <span class="chart-title-meta ${trendClass}">${escapeHtml(metaText)}</span>` : '';
+  title.innerHTML = `${escapeHtml(baseTitle)}${meta}`;
+}
+
+function sliceChartPayload(chartKey, labels, seriesMap) {
+  const selectedRange = getChartRange(chartKey);
+  return sliceByRange(labels, seriesMap, selectedRange, getRangePresets(chartKey));
+}
+
+function rerenderChartByKey(chartKey) {
+  if (chartKey === 'timing') {
+    drawTimingChart();
+    return;
+  }
+  if (chartKey === 'goldOneDay') {
+    drawGoldOneDayChart();
+    return;
+  }
+  if (chartKey === 'goldHistory') {
+    drawGoldHistoryChart();
+    return;
+  }
+  if (chartKey === 'fund') {
+    drawFundTrendChart();
+  }
 }
 
 function renderTimingChart(data) {
-  const canvas = document.getElementById('timingChart');
-  if (!canvas || !data || !Array.isArray(data.labels) || data.labels.length === 0) {
+  if (!data || !Array.isArray(data.labels) || data.labels.length === 0) {
+    chartDataCache.timing = null;
+    destroyChart('timing');
+    const wrap = document.querySelector('#timingChart')?.parentElement;
+    if (wrap) {
+      wrap.innerHTML = '<div class="empty-state">暂无上证分时数据</div>';
+    }
+    return;
+  }
+
+  chartDataCache.timing = {
+    labels: data.labels,
+    changes: toNumberSeries(data.change_pcts),
+    prices: toNumberSeries(data.prices),
+    changeAmounts: toNumberSeries(data.change_amounts),
+    volumes: toNumberSeries(data.volumes),
+    amounts: toNumberSeries(data.amounts)
+  };
+  drawTimingChart();
+}
+
+function drawTimingChart() {
+  const cache = chartDataCache.timing;
+  let canvas = document.getElementById('timingChart');
+  if (!cache) {
+    return;
+  }
+  if (!canvas) {
+    const chartWrap = document.querySelector('#timingChartTitle')?.closest('.chart-card')?.querySelector('.chart-canvas-wrap');
+    if (chartWrap) {
+      chartWrap.innerHTML = '<canvas id="timingChart"></canvas>';
+      canvas = document.getElementById('timingChart');
+    }
+  }
+  if (!canvas) {
     return;
   }
   if (!canUseCharts()) {
@@ -745,104 +883,75 @@ function renderTimingChart(data) {
     return;
   }
 
-  const labels = data.labels;
-  const changes = (data.change_pcts || []).map((item) => Number(item) || 0);
-  const prices = (data.prices || []).map((item) => Number(item) || 0);
-  const changeAmounts = (data.change_amounts || []).map((item) => Number(item) || 0);
-  const volumes = (data.volumes || []).map((item) => Number(item) || 0);
-  const amounts = (data.amounts || []).map((item) => Number(item) || 0);
+  const latestPct = cache.changes.length > 0 ? cache.changes[cache.changes.length - 1] : 0;
+  const latestPrice = cache.prices.length > 0 ? cache.prices[cache.prices.length - 1] : 0;
+  updateChartTitle('timingChartTitle', '上证分时', `${formatSigned(latestPct, 2, '%')} (${formatPrice(latestPrice, 2)})`, latestPct);
 
-  const latestPct = changes.length > 0 ? changes[changes.length - 1] : 0;
-  const latestPrice = prices.length > 0 ? prices[prices.length - 1] : 0;
-  updateTimingChartTitle(latestPct, latestPrice);
-
-  if (isChartReusable('timing', canvas)) {
-    const chart = chartInstances.timing;
-    chart.$timingPayload = {
-      changes,
-      prices,
-      changeAmounts,
-      volumes,
-      amounts
-    };
-    chart.data.labels = labels;
-    chart.data.datasets[0].data = changes;
-    chart.update('none');
+  const sliced = sliceChartPayload('timing', cache.labels, {
+    changes: cache.changes,
+    prices: cache.prices,
+    changeAmounts: cache.changeAmounts,
+    volumes: cache.volumes,
+    amounts: cache.amounts
+  });
+  const labels = sliced.labels;
+  const payload = sliced.seriesMap;
+  if (labels.length === 0) {
     return;
   }
 
-  destroyChart('timing');
-
-  const ctx = canvas.getContext('2d');
-  chartInstances.timing = new window.Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '涨跌幅 (%)',
-          data: changes,
-          borderColor: '#d4a853',
-          backgroundColor: 'rgba(212, 168, 83, 0.1)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 0,
-          pointHoverRadius: 3,
-          borderWidth: 2
-        }
-      ]
+  const dataset = buildLineDataset({
+    label: '涨跌幅 (%)',
+    data: payload.changes,
+    semanticTrend: true,
+    semanticBaseline: 0,
+    palette: {
+      up: '#e0314d',
+      down: '#0b8b74',
+      neutral: '#7a879d'
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label(context) {
-              const payload = context.chart.$timingPayload || {};
-              const index = context.dataIndex;
-              const pct = payload.changes?.[index] || 0;
-              const price = payload.prices?.[index] || 0;
-              const changeAmount = payload.changeAmounts?.[index] || 0;
-              const volume = payload.volumes?.[index] || 0;
-              const amount = payload.amounts?.[index] || 0;
-              return [
-                `涨跌幅: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
-                `上证指数: ${price.toFixed(2)}`,
-                `涨跌额: ${changeAmount >= 0 ? '+' : ''}${changeAmount.toFixed(2)}`,
-                `成交量: ${volume.toFixed(0)}万手`,
-                `成交额: ${amount.toFixed(2)}亿`
-              ];
-            }
-          }
-        }
+    fillAboveAlpha: 0.15,
+    fillBelowAlpha: 0.13
+  });
+  const options = buildLineChartOptions({
+    maxXTicks: 8,
+    yTitle: '涨跌幅 (%)',
+    yTickFormatter: (value) => formatSigned(value, 2, '%'),
+    zeroAxis: true,
+    extrema: true,
+    extremaFormatter: (value) => formatSigned(value, 2, '%'),
+    decimationSamples: 96,
+    tooltipCallbacks: {
+      title(context) {
+        return `时间: ${context[0]?.label || '--'}`;
       },
-      scales: {
-        x: {
-          ticks: { color: '#9a9489', maxTicksLimit: 8 },
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        },
-        y: {
-          ticks: {
-            color: '#9a9489',
-            callback(value) {
-              const numberValue = Number(value) || 0;
-              return `${numberValue >= 0 ? '+' : ''}${numberValue.toFixed(2)}%`;
-            }
-          },
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        }
+      label(context) {
+        const index = context.dataIndex;
+        const pct = payload.changes?.[index] || 0;
+        const price = payload.prices?.[index] || 0;
+        const changeAmount = payload.changeAmounts?.[index] || 0;
+        const volume = payload.volumes?.[index] || 0;
+        const amount = payload.amounts?.[index] || 0;
+        return [
+          `涨跌幅: ${formatSigned(pct, 2, '%')}`,
+          `上证指数: ${formatPrice(price, 2)}`,
+          `涨跌额: ${formatSigned(changeAmount, 2)}`,
+          `成交量: ${formatPrice(volume, 0)}万手`,
+          `成交额: ${formatPrice(amount, 2)}亿`
+        ];
       }
     }
   });
-  chartInstances.timing.$timingPayload = {
-    changes,
-    prices,
-    changeAmounts,
-    volumes,
-    amounts
-  };
+
+  createOrUpdateLineChart({
+    chartKey: 'timing',
+    chartInstances,
+    canvas,
+    labels,
+    dataset,
+    options,
+    payload
+  });
 }
 
 function renderGoldOneDayChart(records) {
@@ -851,18 +960,8 @@ function renderGoldOneDayChart(records) {
   if (!chartWrap) {
     return;
   }
-
-  let canvas = document.getElementById('goldOneDayChart');
-  if (!canvas) {
-    chartWrap.innerHTML = '<canvas id="goldOneDayChart"></canvas>';
-    canvas = document.getElementById('goldOneDayChart');
-  }
-  if (!canUseCharts()) {
-    setChartUnavailable(chartWrap);
-    return;
-  }
-
   if (!Array.isArray(records) || records.length === 0) {
+    chartDataCache.goldOneDay = null;
     destroyChart('goldOneDay');
     chartWrap.innerHTML = '<div class="empty-state">暂无分时金价数据</div>';
     return;
@@ -879,62 +978,85 @@ function renderGoldOneDayChart(records) {
   });
 
   if (labels.length === 0) {
+    chartDataCache.goldOneDay = null;
     destroyChart('goldOneDay');
     chartWrap.innerHTML = '<div class="empty-state">暂无分时金价数据</div>';
     return;
   }
 
-  const latestPrice = prices[prices.length - 1];
-  const latestTime = labels[labels.length - 1];
-  const title = document.getElementById('goldOneDayTitle');
-  if (title) {
-    title.textContent = `分时黄金价格  最新: ¥${latestPrice.toFixed(2)}  ${latestTime}`;
-  }
+  chartDataCache.goldOneDay = { labels, prices };
+  drawGoldOneDayChart();
+}
 
-  if (isChartReusable('goldOneDay', canvas)) {
-    const chart = chartInstances.goldOneDay;
-    chart.data.labels = labels;
-    chart.data.datasets[0].data = prices;
-    chart.update('none');
+function drawGoldOneDayChart() {
+  const cache = chartDataCache.goldOneDay;
+  const chartWrap = document.querySelector('#goldOneDayChart')?.parentElement
+    || document.querySelector('#goldOneDayTitle')?.closest('.chart-card')?.querySelector('.chart-canvas-wrap');
+  if (!chartWrap || !cache) {
     return;
   }
 
-  destroyChart('goldOneDay');
+  let canvas = document.getElementById('goldOneDayChart');
+  if (!canvas) {
+    chartWrap.innerHTML = '<canvas id="goldOneDayChart"></canvas>';
+    canvas = document.getElementById('goldOneDayChart');
+  }
+  if (!canvas) {
+    return;
+  }
+  if (!canUseCharts()) {
+    setChartUnavailable(chartWrap);
+    return;
+  }
 
-  const ctx = canvas.getContext('2d');
-  chartInstances.goldOneDay = new window.Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '金价 (元/克)',
-          data: prices,
-          borderColor: '#c9923a',
-          backgroundColor: 'rgba(201, 146, 58, 0.1)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 0,
-          pointHoverRadius: 3,
-          borderWidth: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        x: {
-          ticks: { color: '#9a9489', maxTicksLimit: 12 },
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        },
-        y: {
-          ticks: { color: '#9a9489' },
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        }
+  const latestPrice = cache.prices[cache.prices.length - 1] || 0;
+  const latestTime = cache.labels[cache.labels.length - 1] || '--';
+  const startPrice = cache.prices[0] || 0;
+  const trend = latestPrice - startPrice;
+  updateChartTitle('goldOneDayTitle', '分时黄金价格', `最新 ¥${formatPrice(latestPrice, 2)} ${latestTime}`, trend);
+
+  const sliced = sliceChartPayload('goldOneDay', cache.labels, {
+    prices: cache.prices
+  });
+  const labels = sliced.labels;
+  const payload = sliced.seriesMap;
+  if (labels.length === 0) {
+    return;
+  }
+
+  const dataset = buildLineDataset({
+    label: '金价 (元/克)',
+    data: payload.prices,
+    semanticTrend: false,
+    fixedColor: '#c88a2f',
+    fillAlpha: 0.11
+  });
+  const options = buildLineChartOptions({
+    maxXTicks: 10,
+    yTickFormatter: (value) => `¥${formatPrice(value, 1)}`,
+    extrema: true,
+    extremaFormatter: (value) => `¥${formatPrice(value, 2)}`,
+    decimationSamples: 90,
+    tooltipCallbacks: {
+      title(context) {
+        return `时间: ${context[0]?.label || '--'}`;
+      },
+      label(context) {
+        const index = context.dataIndex;
+        const price = payload.prices?.[index] || 0;
+        return `金价: ¥${formatPrice(price, 2)} / 克`;
       }
     }
+  });
+
+  createOrUpdateLineChart({
+    chartKey: 'goldOneDay',
+    chartInstances,
+    canvas,
+    labels,
+    dataset,
+    options,
+    payload
   });
 }
 
@@ -946,17 +1068,8 @@ function renderGoldHistoryChart(records) {
     return;
   }
 
-  let canvas = document.getElementById('goldHistoryChart');
-  if (!canvas) {
-    chartWrap.innerHTML = '<canvas id="goldHistoryChart"></canvas>';
-    canvas = document.getElementById('goldHistoryChart');
-  }
-  if (!canUseCharts()) {
-    setChartUnavailable(chartWrap);
-    return;
-  }
-
   if (!Array.isArray(records) || records.length === 0) {
+    chartDataCache.goldHistory = null;
     destroyChart('goldHistory');
     chartWrap.innerHTML = '<div class="empty-state">暂无历史金价数据</div>';
     return;
@@ -975,64 +1088,94 @@ function renderGoldHistoryChart(records) {
   });
 
   if (normalized.length === 0) {
+    chartDataCache.goldHistory = null;
     destroyChart('goldHistory');
     chartWrap.innerHTML = '<div class="empty-state">暂无历史金价数据</div>';
     return;
   }
 
   normalized.reverse();
-  const labels = normalized.map((item) => item.date);
-  const prices = normalized.map((item) => item.value);
+  chartDataCache.goldHistory = {
+    labels: normalized.map((item) => item.date),
+    prices: normalized.map((item) => item.value)
+  };
+  drawGoldHistoryChart();
+}
 
-  if (isChartReusable('goldHistory', canvas)) {
-    const chart = chartInstances.goldHistory;
-    chart.data.labels = labels;
-    chart.data.datasets[0].data = prices;
-    chart.update('none');
+function drawGoldHistoryChart() {
+  const cache = chartDataCache.goldHistory;
+  const chartWrap = document.querySelector('#goldHistoryChart')?.parentElement
+    || document.querySelector('#goldHistoryChart')?.closest('.chart-canvas-wrap')
+    || document.querySelector('.metals-grid .chart-card:nth-child(3) .chart-canvas-wrap');
+  if (!chartWrap || !cache) {
     return;
   }
 
-  destroyChart('goldHistory');
+  let canvas = document.getElementById('goldHistoryChart');
+  if (!canvas) {
+    chartWrap.innerHTML = '<canvas id="goldHistoryChart"></canvas>';
+    canvas = document.getElementById('goldHistoryChart');
+  }
+  if (!canvas) {
+    return;
+  }
+  if (!canUseCharts()) {
+    setChartUnavailable(chartWrap);
+    return;
+  }
 
-  const ctx = canvas.getContext('2d');
-  chartInstances.goldHistory = new window.Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '中国黄金基础金价 (元/克)',
-          data: prices,
-          borderColor: '#5cb97a',
-          backgroundColor: 'rgba(92, 185, 122, 0.08)',
-          fill: true,
-          tension: 0.25,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          borderWidth: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          ticks: { color: '#9a9489', maxTicksLimit: 8 },
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        },
-        y: {
-          ticks: { color: '#9a9489' },
-          grid: { color: 'rgba(255, 255, 255, 0.05)' }
-        }
+  const latestPrice = cache.prices[cache.prices.length - 1] || 0;
+  const prevPrice = cache.prices[cache.prices.length - 2] || latestPrice;
+  updateChartTitle('goldHistoryTitle', '历史金价', `最新 ¥${formatPrice(latestPrice, 2)}`, latestPrice - prevPrice);
+
+  const sliced = sliceChartPayload('goldHistory', cache.labels, {
+    prices: cache.prices
+  });
+  const labels = sliced.labels;
+  const payload = sliced.seriesMap;
+  if (labels.length === 0) {
+    return;
+  }
+
+  const dataset = buildLineDataset({
+    label: '中国黄金基础金价 (元/克)',
+    data: payload.prices,
+    semanticTrend: false,
+    fixedColor: '#4f6f99',
+    fillAlpha: 0.1,
+    tension: 0.22
+  });
+  const options = buildLineChartOptions({
+    maxXTicks: 8,
+    yTickFormatter: (value) => `¥${formatPrice(value, 1)}`,
+    extrema: true,
+    extremaFormatter: (value) => `¥${formatPrice(value, 2)}`,
+    decimationSamples: 72,
+    tooltipCallbacks: {
+      title(context) {
+        return `日期: ${context[0]?.label || '--'}`;
+      },
+      label(context) {
+        const index = context.dataIndex;
+        const price = payload.prices?.[index] || 0;
+        return `中国黄金基础金价: ¥${formatPrice(price, 2)} / 克`;
       }
     }
+  });
+
+  createOrUpdateLineChart({
+    chartKey: 'goldHistory',
+    chartInstances,
+    canvas,
+    labels,
+    dataset,
+    options,
+    payload
   });
 }
 
 async function loadAndRenderFundChart(fundCode) {
   const chartWrap = document.getElementById('fundTrendCanvasWrap');
-  const chartTitle = document.getElementById('fundTrendTitle');
   let canvas = document.getElementById('fundTrendChart');
 
   if (!chartWrap || !fundCode) {
@@ -1056,73 +1199,147 @@ async function loadAndRenderFundChart(fundCode) {
 
     const chartData = result.chart_data;
     const labels = Array.isArray(chartData.labels) ? chartData.labels : [];
-    const growth = Array.isArray(chartData.growth) ? chartData.growth.map((item) => Number(item) || 0) : [];
+    const growth = toNumberSeries(chartData.growth);
+    const netValues = toNumberSeries(chartData.net_values);
     const fundName = result.fund_info?.name || fundCode;
-
-    if (chartTitle) {
-      chartTitle.textContent = `基金估值走势 - ${fundCode} ${fundName}`;
-    }
 
     if (labels.length === 0 || growth.length === 0) {
       destroyChart('fund');
+      chartDataCache.fund = null;
       chartWrap.innerHTML = '<div class="empty-state">暂无该基金估值走势数据</div>';
       return;
     }
 
-    const realCanvas = document.getElementById('fundTrendChart') || canvas;
-    if (isChartReusable('fund', realCanvas)) {
-      const chart = chartInstances.fund;
-      chart.data.labels = labels;
-      chart.data.datasets[0].data = growth;
-      chart.update('none');
+    chartDataCache.fund = {
+      fundCode,
+      fundName,
+      labels,
+      growth,
+      netValues
+    };
+    drawFundTrendChart();
+  } catch (error) {
+    chartDataCache.fund = null;
+    destroyChart('fund');
+    chartWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function drawFundTrendChart() {
+  const cache = chartDataCache.fund;
+  const chartWrap = document.getElementById('fundTrendCanvasWrap');
+  let canvas = document.getElementById('fundTrendChart');
+  if (!chartWrap || !cache) {
+    return;
+  }
+
+  if (!canvas) {
+    chartWrap.innerHTML = '<canvas id="fundTrendChart"></canvas>';
+    canvas = document.getElementById('fundTrendChart');
+  }
+  if (!canvas) {
+    return;
+  }
+  if (!canUseCharts()) {
+    setChartUnavailable(chartWrap);
+    return;
+  }
+
+  const latestGrowth = cache.growth[cache.growth.length - 1] || 0;
+  const latestNet = cache.netValues[cache.netValues.length - 1] || 0;
+  updateChartTitle(
+    'fundTrendTitle',
+    `基金估值走势 - ${cache.fundCode} ${cache.fundName}`,
+    `${formatSigned(latestGrowth, 2, '%')} | 净值 ${formatPrice(latestNet, 4)}`,
+    latestGrowth
+  );
+
+  const sliced = sliceChartPayload('fund', cache.labels, {
+    growth: cache.growth,
+    netValues: cache.netValues
+  });
+  const labels = sliced.labels;
+  const payload = sliced.seriesMap;
+  if (labels.length === 0) {
+    return;
+  }
+
+  const dataset = buildLineDataset({
+    label: '涨幅 (%)',
+    data: payload.growth,
+    semanticTrend: true,
+    semanticBaseline: 0,
+    palette: {
+      up: '#e0314d',
+      down: '#0b8b74',
+      neutral: '#7a879d'
+    },
+    fillAboveAlpha: 0.15,
+    fillBelowAlpha: 0.13,
+    tension: 0.35
+  });
+  const options = buildLineChartOptions({
+    maxXTicks: 8,
+    yTitle: '涨幅 (%)',
+    yTickFormatter: (value) => formatSigned(value, 2, '%'),
+    zeroAxis: true,
+    extrema: true,
+    extremaFormatter: (value) => formatSigned(value, 2, '%'),
+    decimationSamples: 96,
+    tooltipCallbacks: {
+      title(context) {
+        return `时间: ${context[0]?.label || '--'}`;
+      },
+      label(context) {
+        const index = context.dataIndex;
+        const growth = payload.growth?.[index] || 0;
+        const netValue = payload.netValues?.[index] || 0;
+        return [
+          `涨幅: ${formatSigned(growth, 2, '%')}`,
+          `净值: ${formatPrice(netValue, 4)}`
+        ];
+      }
+    }
+  });
+
+  createOrUpdateLineChart({
+    chartKey: 'fund',
+    chartInstances,
+    canvas,
+    labels,
+    dataset,
+    options,
+    payload
+  });
+}
+
+function bindChartRangeControls() {
+  if (bindChartRangeControls.bound) {
+    return;
+  }
+  bindChartRangeControls.bound = true;
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.chart-range-btn');
+    if (!button) {
       return;
     }
 
-    destroyChart('fund');
-    const ctx = realCanvas.getContext('2d');
-    chartInstances.fund = new window.Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: '涨幅 (%)',
-            data: growth,
-            borderColor: '#d4a853',
-            backgroundColor: 'rgba(212, 168, 83, 0.08)',
-            fill: true,
-            tension: 0.35,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            borderWidth: 2
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          x: {
-            ticks: { color: '#9a9489', maxTicksLimit: 8 },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
-          },
-          y: {
-            ticks: {
-              color: '#9a9489',
-              callback(value) {
-                const numberValue = Number(value) || 0;
-                return `${numberValue >= 0 ? '+' : ''}${numberValue.toFixed(2)}%`;
-              }
-            },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
-          }
-        }
-      }
-    });
-  } catch (error) {
-    chartWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
-  }
+    const chartKey = button.dataset.chartKey;
+    const rangeValue = button.dataset.range;
+    if (!chartKey || !rangeValue || !CHART_RANGE_PRESETS[chartKey]) {
+      return;
+    }
+
+    event.preventDefault();
+    const previous = getChartRange(chartKey);
+    setChartRange(chartKey, rangeValue);
+    const next = getChartRange(chartKey);
+    syncChartRangeButtons(chartKey);
+    if (next !== previous || !button.classList.contains('active')) {
+      rerenderChartByKey(chartKey);
+    }
+  });
 }
 
 function shouldSkipCustomLoad(cacheKey, force) {
@@ -1159,9 +1376,15 @@ async function loadFundsSection(targetElement, force = false) {
       .map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} - ${escapeHtml(item.name)}</option>`)
       .join('');
 
-    const chartHeaderRight = funds.length > 0
+    const selectorControl = funds.length > 0
       ? `<select class="chart-selector" id="fundChartSelector">${selectorOptions}</select>`
       : '';
+    const chartHeaderRight = `
+      <div class="chart-header-actions">
+        ${selectorControl}
+        ${getChartRangeControls('fund')}
+      </div>
+    `;
 
     targetElement.innerHTML = `
       <div class="fund-main-section">
@@ -1187,6 +1410,7 @@ async function loadFundsSection(targetElement, force = false) {
     `;
 
     executeEmbeddedScripts(targetElement);
+    syncAllChartRangeButtons(targetElement);
     if (typeof window.autoColorize === 'function') {
       window.autoColorize();
     }
@@ -1209,6 +1433,8 @@ async function loadFundsSection(targetElement, force = false) {
       await loadAndRenderFundChart(defaultFund.code);
     } else {
       const chartWrap = document.getElementById('fundTrendCanvasWrap');
+      chartDataCache.fund = null;
+      destroyChart('fund');
       if (chartWrap) {
         chartWrap.innerHTML = '<div class="empty-state">暂无基金估值图数据</div>';
       }
@@ -1238,6 +1464,9 @@ async function loadTimingSection(targetElement, force = false) {
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-card-title" id="timingChartTitle">上证分时</h3>
+            <div class="chart-header-actions">
+              ${getChartRangeControls('timing')}
+            </div>
           </div>
           <div class="chart-card-content">
             <div class="chart-canvas-wrap">
@@ -1255,6 +1484,7 @@ async function loadTimingSection(targetElement, force = false) {
     `;
 
     executeEmbeddedScripts(targetElement);
+    syncAllChartRangeButtons(targetElement);
     if (typeof window.autoColorize === 'function') {
       window.autoColorize();
     }
@@ -1292,6 +1522,9 @@ async function loadPreciousMetalsSection(targetElement, force = false, sectionKe
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-card-title" id="goldOneDayTitle">分时黄金价格</h3>
+            <div class="chart-header-actions">
+              ${getChartRangeControls('goldOneDay')}
+            </div>
           </div>
           <div class="chart-card-content">
             <div class="chart-canvas-wrap">
@@ -1301,7 +1534,10 @@ async function loadPreciousMetalsSection(targetElement, force = false, sectionKe
         </div>
         <div class="chart-card">
           <div class="chart-card-header">
-            <h3 class="chart-card-title">历史金价</h3>
+            <h3 class="chart-card-title" id="goldHistoryTitle">历史金价</h3>
+            <div class="chart-header-actions">
+              ${getChartRangeControls('goldHistory')}
+            </div>
           </div>
           <div class="chart-card-content">
             <div class="chart-canvas-wrap">
@@ -1315,6 +1551,7 @@ async function loadPreciousMetalsSection(targetElement, force = false, sectionKe
     `;
 
     executeEmbeddedScripts(targetElement);
+    syncAllChartRangeButtons(targetElement);
     if (typeof window.autoColorize === 'function') {
       window.autoColorize();
     }
@@ -1394,6 +1631,8 @@ async function refreshFundsSectionSilently(targetElement) {
   }
 
   const chartWrap = document.getElementById('fundTrendCanvasWrap');
+  chartDataCache.fund = null;
+  destroyChart('fund');
   if (chartWrap) {
     chartWrap.innerHTML = '<div class="empty-state">暂无基金估值图数据</div>';
   }
@@ -1642,6 +1881,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSidebarToggle();
   initTopNavMotion();
   bindSidebarActions();
+  bindChartRangeControls();
   await navigateToSection(currentSection || DEFAULT_SECTION, true);
 
   window.addEventListener('popstate', async () => {
