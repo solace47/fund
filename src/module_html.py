@@ -643,34 +643,29 @@ def get_shared_modal_html(include_fund_chart_selector=False):
         <div class="sector-modal-content modal-panel modal-panel-compact">
             <div class="sector-modal-header" id="sharesModalTitle">修改持仓</div>
             <div class="modal-body">
-                <div class="modal-field">
-                    <label class="modal-label">最新净值（日期）</label>
-                    <div id="sharesModalNetInfo" class="shares-net-info">--</div>
-                </div>
+                <div id="sharesModalNetInfo" class="shares-net-info">--</div>
                 <div class="shares-mode-row">
-                    <button id="sharesModalModeBtn" class="btn btn-secondary" type="button" onclick="toggleHoldingInputMode()">转换为份额输入</button>
+                    <button id="sharesModalModeBtn" class="shares-mode-toggle" type="button" onclick="toggleHoldingInputMode()">⇄ 份额</button>
                 </div>
-                <div class="modal-field">
+                <div class="modal-field" id="sharesAmountField">
                     <label class="modal-label" for="sharesModalAmountInput">持有金额</label>
                     <input class="modal-input" type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额">
                 </div>
-                <div class="modal-field">
-                    <label class="modal-label" for="sharesModalInput">持仓份额</label>
-                    <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额">
+                <div class="modal-field" id="sharesInputField" hidden>
+                    <label class="modal-label" for="sharesModalInput">持有份额</label>
+                    <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持有份额">
                 </div>
-                <div class="modal-field">
+                <div class="modal-field" id="sharesProfitField">
                     <label class="modal-label" for="sharesModalProfitInput">持有收益</label>
                     <input class="modal-input" type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益">
+                </div>
+                <div class="modal-field" id="sharesCostField" hidden>
+                    <label class="modal-label" for="sharesModalCostInput">持有成本</label>
+                    <input class="modal-input" type="number" id="sharesModalCostInput" step="0.01" min="0" placeholder="请输入持有成本">
                 </div>
                 <div class="modal-field">
                     <label class="modal-label" for="sharesModalDaysInput">持有天数</label>
                     <input class="modal-input" type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数">
-                </div>
-                <div id="sharesModalSharesPreview" class="shares-preview">
-                    换算份额：0.00 份 | 当前持仓市值：0.00
-                </div>
-                <div class="shares-note">
-                    说明：金额和份额会按当前净值双向换算，保存时以份额为准。
                 </div>
                 <div class="holding-sync-grid">
                     <button class="btn btn-secondary btn-soft-danger" type="button" onclick="openHoldingSyncAction('buy')">同步加仓</button>

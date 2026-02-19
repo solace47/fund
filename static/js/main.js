@@ -1427,9 +1427,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function formatNetValueDate(dateText) {
         if (!dateText || dateText === '--') return '--';
-        if (dateText.length === 5) return dateText;
-        if (dateText.length === 10) return dateText.slice(5);
-        return dateText;
+        let monthText = '';
+        let dayText = '';
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+            const parts = dateText.split('-');
+            monthText = parts[1];
+            dayText = parts[2];
+        } else if (/^\d{2}-\d{2}$/.test(dateText)) {
+            const parts = dateText.split('-');
+            monthText = parts[0];
+            dayText = parts[1];
+        } else if (/^\d{1,2}-\d{1,2}$/.test(dateText)) {
+            return dateText;
+        } else {
+            return dateText;
+        }
+
+        const month = parseInt(monthText, 10);
+        const day = parseInt(dayText, 10);
+        if (Number.isNaN(month) || Number.isNaN(day)) {
+            return dateText;
+        }
+        return `${month}-${day}`;
     }
 
     function getHoldingMetaStorageKey(fundCode) {
@@ -1439,30 +1459,41 @@ document.addEventListener('DOMContentLoaded', function () {
     function loadHoldingMeta(fundCode) {
         try {
             const raw = localStorage.getItem(getHoldingMetaStorageKey(fundCode));
-            if (!raw) return { profit: '', days: '' };
+            if (!raw) return { profit: '', cost: '', days: '' };
             const parsed = JSON.parse(raw);
             return {
                 profit: parsed && parsed.profit !== undefined ? String(parsed.profit) : '',
+                cost: parsed && parsed.cost !== undefined ? String(parsed.cost) : '',
                 days: parsed && parsed.days !== undefined ? String(parsed.days) : ''
             };
         } catch (e) {
-            return { profit: '', days: '' };
+            return { profit: '', cost: '', days: '' };
         }
     }
 
-    function saveHoldingMeta(fundCode, profit, days) {
+    function saveHoldingMeta(fundCode, patch = {}) {
         try {
-            localStorage.setItem(getHoldingMetaStorageKey(fundCode), JSON.stringify({ profit, days }));
+            const current = loadHoldingMeta(fundCode);
+            const next = {
+                profit: patch.profit !== undefined ? patch.profit : current.profit,
+                cost: patch.cost !== undefined ? patch.cost : current.cost,
+                days: patch.days !== undefined ? patch.days : current.days
+            };
+            localStorage.setItem(getHoldingMetaStorageKey(fundCode), JSON.stringify(next));
         } catch (e) {
             console.warn('保存持仓附加信息失败:', e);
         }
     }
 
     function applyHoldingInputMode() {
+        const amountField = document.getElementById('sharesAmountField');
+        const sharesField = document.getElementById('sharesInputField');
+        const profitField = document.getElementById('sharesProfitField');
+        const costField = document.getElementById('sharesCostField');
         const amountInput = document.getElementById('sharesModalAmountInput');
         const sharesInput = document.getElementById('sharesModalInput');
         const modeBtn = document.getElementById('sharesModalModeBtn');
-        if (!amountInput || !sharesInput || !modeBtn) return;
+        if (!amountInput || !sharesInput || !modeBtn || !amountField || !sharesField || !profitField || !costField) return;
 
         const hasNetValue = currentModalNetValue && currentModalNetValue > 0;
         if (!hasNetValue) {
@@ -1470,20 +1501,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const isAmountMode = holdingInputMode === 'amount' && hasNetValue;
-        amountInput.readOnly = !isAmountMode;
-        amountInput.style.opacity = isAmountMode ? '1' : '0.7';
-        sharesInput.readOnly = isAmountMode;
-        sharesInput.style.opacity = isAmountMode ? '0.7' : '1';
-        modeBtn.textContent = isAmountMode ? '转换为份额输入' : '转换为金额输入';
+        const setFieldVisible = (field, visible) => {
+            field.hidden = !visible;
+            field.style.display = visible ? 'grid' : 'none';
+            field.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        };
+
+        setFieldVisible(amountField, isAmountMode);
+        setFieldVisible(profitField, isAmountMode);
+        setFieldVisible(sharesField, !isAmountMode);
+        setFieldVisible(costField, !isAmountMode);
+        modeBtn.textContent = isAmountMode ? '⇄ 份额' : '⇄ 金额';
+        modeBtn.dataset.mode = isAmountMode ? 'amount' : 'shares';
         modeBtn.disabled = !hasNetValue;
     }
 
     function updateHoldingDerivedValues(sourceField) {
         const amountInput = document.getElementById('sharesModalAmountInput');
         const sharesInput = document.getElementById('sharesModalInput');
-        const preview = document.getElementById('sharesModalSharesPreview');
 
-        if (!amountInput || !sharesInput || !preview || isSyncingHoldingInputs) return;
+        if (!amountInput || !sharesInput || isSyncingHoldingInputs) return;
 
         const hasNetValue = currentModalNetValue && currentModalNetValue > 0;
         isSyncingHoldingInputs = true;
@@ -1505,15 +1542,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 shares = roundToTwo(amount / currentModalNetValue);
                 sharesInput.value = shares.toFixed(2);
             }
-        }
-
-        const finalShares = parseFloat(sharesInput.value) || 0;
-        const finalAmount = parseFloat(amountInput.value) || 0;
-        if (hasNetValue) {
-            preview.textContent =
-                `换算份额：${finalShares.toFixed(2)} 份 | 当前持仓市值：${finalAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        } else {
-            preview.textContent = `换算份额：${finalShares.toFixed(2)} 份 | 净值不可用，暂无法按金额换算`;
         }
 
         isSyncingHoldingInputs = false;
@@ -1549,45 +1577,44 @@ document.addEventListener('DOMContentLoaded', function () {
         const requiredIds = [
             'sharesModalNetInfo',
             'sharesModalModeBtn',
+            'sharesAmountField',
+            'sharesInputField',
+            'sharesProfitField',
+            'sharesCostField',
             'sharesModalAmountInput',
             'sharesModalInput',
             'sharesModalProfitInput',
-            'sharesModalDaysInput',
-            'sharesModalSharesPreview'
+            'sharesModalCostInput',
+            'sharesModalDaysInput'
         ];
 
         const modalContent = `
             <div class="sector-modal-content modal-panel modal-panel-compact">
                 <div class="sector-modal-header" id="sharesModalTitle">修改持仓</div>
                 <div class="modal-body">
-                    <div class="modal-field">
-                        <label class="modal-label">最新净值（日期）</label>
-                        <div id="sharesModalNetInfo" class="shares-net-info">--</div>
-                    </div>
+                    <div id="sharesModalNetInfo" class="shares-net-info">--</div>
                     <div class="shares-mode-row">
-                        <button id="sharesModalModeBtn" class="btn btn-secondary" type="button" onclick="toggleHoldingInputMode()">转换为份额输入</button>
+                        <button id="sharesModalModeBtn" class="shares-mode-toggle" type="button" onclick="toggleHoldingInputMode()">⇄ 份额</button>
                     </div>
-                    <div class="modal-field">
+                    <div class="modal-field" id="sharesAmountField">
                         <label class="modal-label" for="sharesModalAmountInput">持有金额</label>
                         <input class="modal-input" type="number" id="sharesModalAmountInput" step="0.01" min="0" placeholder="请输入持有金额">
                     </div>
-                    <div class="modal-field">
-                        <label class="modal-label" for="sharesModalInput">持仓份额</label>
-                        <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持仓份额">
+                    <div class="modal-field" id="sharesInputField" hidden>
+                        <label class="modal-label" for="sharesModalInput">持有份额</label>
+                        <input class="modal-input" type="number" id="sharesModalInput" step="0.01" min="0" placeholder="请输入持有份额">
                     </div>
-                    <div class="modal-field">
+                    <div class="modal-field" id="sharesProfitField">
                         <label class="modal-label" for="sharesModalProfitInput">持有收益</label>
                         <input class="modal-input" type="number" id="sharesModalProfitInput" step="0.01" placeholder="请输入持有收益">
+                    </div>
+                    <div class="modal-field" id="sharesCostField" hidden>
+                        <label class="modal-label" for="sharesModalCostInput">持有成本</label>
+                        <input class="modal-input" type="number" id="sharesModalCostInput" step="0.01" min="0" placeholder="请输入持有成本">
                     </div>
                     <div class="modal-field">
                         <label class="modal-label" for="sharesModalDaysInput">持有天数</label>
                         <input class="modal-input" type="number" id="sharesModalDaysInput" step="1" min="0" placeholder="请输入持有天数">
-                    </div>
-                    <div id="sharesModalSharesPreview" class="shares-preview">
-                        换算份额：0.00 份 | 当前持仓市值：0.00
-                    </div>
-                    <div class="shares-note">
-                        说明：金额和份额会按当前净值双向换算，保存时以份额为准。
                     </div>
                     <div class="holding-sync-grid">
                         <button class="btn btn-secondary btn-soft-danger" type="button" onclick="openHoldingSyncAction('buy')">同步加仓</button>
@@ -1675,9 +1702,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const amountInput = document.getElementById('sharesModalAmountInput');
         const sharesInput = document.getElementById('sharesModalInput');
         const profitInput = document.getElementById('sharesModalProfitInput');
+        const costInput = document.getElementById('sharesModalCostInput');
         const daysInput = document.getElementById('sharesModalDaysInput');
 
-        if (!modal || !netInfo || !amountInput || !sharesInput || !profitInput || !daysInput) return;
+        if (!modal || !netInfo || !amountInput || !sharesInput || !profitInput || !costInput || !daysInput) return;
 
         const sharesValue = window.getFundShares(fundCode) || 0;
         const snapshot = parseFundSnapshot(fundCode);
@@ -1687,6 +1715,7 @@ document.addEventListener('DOMContentLoaded', function () {
         sharesInput.value = sharesValue > 0 ? Number(sharesValue).toFixed(2) : '';
         amountInput.value = '';
         profitInput.value = meta.profit;
+        costInput.value = meta.cost;
         daysInput.value = meta.days;
         holdingInputMode = 'amount';
 
@@ -1705,9 +1734,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             netInfo.innerHTML =
                 `最新净值（${dateText}）：<span class="shares-net-value">${currentModalNetValue.toFixed(4)}</span> <span class="shares-net-change ${growthColor}">${growthText}</span>`;
-            amountInput.placeholder = '请输入持仓金额';
+            amountInput.placeholder = '请输入持有金额';
         } else {
-            netInfo.textContent = '最新净值暂不可用';
+            netInfo.textContent = '--';
             amountInput.placeholder = '净值不可用，暂无法按金额换算';
         }
 
@@ -1734,19 +1763,27 @@ document.addEventListener('DOMContentLoaded', function () {
         const sharesInput = document.getElementById('sharesModalInput');
         const amountInput = document.getElementById('sharesModalAmountInput');
         const profitInput = document.getElementById('sharesModalProfitInput');
+        const costInput = document.getElementById('sharesModalCostInput');
         const daysInput = document.getElementById('sharesModalDaysInput');
         let shares = parseFloat(sharesInput ? sharesInput.value : '');
         const amount = parseFloat(amountInput ? amountInput.value : '');
         const profitRaw = profitInput ? profitInput.value.trim() : '';
+        const costRaw = costInput ? costInput.value.trim() : '';
         const daysRaw = daysInput ? daysInput.value.trim() : '';
+        const isAmountMode = holdingInputMode === 'amount' && currentModalNetValue && currentModalNetValue > 0;
 
-        if (!Number.isNaN(amount) && amount === 0) {
-            shares = 0;
+        if (isAmountMode) {
+            if (Number.isNaN(amount) || amount < 0) {
+                showNoticeDialog('请输入大于等于 0 的持有金额', { tone: 'warning' });
+                return;
+            }
+            shares = amount === 0 ? 0 : roundToTwo(amount / currentModalNetValue);
+        } else {
+            if (Number.isNaN(shares)) {
+                shares = 0;
+            }
+            shares = roundToTwo(shares);
         }
-        if (Number.isNaN(shares)) {
-            shares = 0;
-        }
-        shares = roundToTwo(shares);
 
         if (shares < 0) {
             showNoticeDialog('持仓份额不能为负数', { tone: 'warning' });
@@ -1775,7 +1812,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 window.fundSharesData[currentSharesFundCode] = shares;
 
-                saveHoldingMeta(currentSharesFundCode, profitRaw, daysRaw);
+                saveHoldingMeta(currentSharesFundCode, { profit: profitRaw, cost: costRaw, days: daysRaw });
                 updateSharesButton(currentSharesFundCode, shares);
                 calculatePositionSummary();
                 window.closeSharesModal();
