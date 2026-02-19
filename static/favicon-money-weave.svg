@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fund icon">
+  <defs>
+    <linearGradient id="moneyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4a54c"/>
+      <stop offset="100%" stop-color="#a87323"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a8f7a"/>
+      <stop offset="100%" stop-color="#1565a8"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#ffffff" stroke="#e7edf4" stroke-width="1.8"/>
+
+  <!-- Enlarged circular region without petal blades -->
+  <circle cx="32" cy="32" r="19.8" fill="#ffffff" stroke="#ecf2f8" stroke-width="3.2"/>
+  <circle cx="32" cy="32" r="16.8" fill="#f9fcff"/>
+
+  <!-- Woven-style ring accents -->
+  <g fill="none" stroke="url(#ringGrad)" stroke-width="1.8" stroke-linecap="round" opacity="0.9">
+    <path d="M32 14.9a17.1 17.1 0 0 1 11.2 4.2"/>
+    <path d="M49.1 32a17.1 17.1 0 0 1-4.2 11.2"/>
+    <path d="M32 49.1a17.1 17.1 0 0 1-11.2-4.2"/>
+    <path d="M14.9 32a17.1 17.1 0 0 1 4.2-11.2"/>
+  </g>
+
+  <!-- Enlarged money symbol -->
+  <g transform="translate(32 32)">
+    <path d="M0 -9.8V10.6" fill="none" stroke="url(#moneyGrad)" stroke-width="2.8" stroke-linecap="round"/>
+    <path d="M6.2 -6.5c0-4.4-12.4-4.6-12.4 0c0 4.4 12.4 4.2 12.4 8.6c0 4.5-12.4 4.4-12.4 0" fill="none" stroke="url(#moneyGrad)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

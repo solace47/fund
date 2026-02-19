@@ -963,47 +963,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // 下载fund_map.json
-    window.downloadFundMap = function () {
-        window.location.href = '/api/fund/download';
-    };
-
-    // 上传fund_map.json
-    window.uploadFundMap = async function (file) {
-        if (!file) {
-            showNoticeDialog('请选择文件', { tone: 'warning' });
-            return;
-        }
-
-        if (!file.name.endsWith('.json')) {
-            showNoticeDialog('只支持JSON文件', { tone: 'warning' });
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await fetch('/api/fund/upload', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            if (result.success) {
-                showNoticeDialog(result.message, {
-                    tone: 'success',
-                    confirmText: '刷新页面',
-                    dismissible: false,
-                    onConfirm: () => location.reload()
-                });
-            } else {
-                showNoticeDialog(result.message, { tone: inferMessageTone(result.message) });
-            }
-        } catch (e) {
-            showNoticeDialog('上传失败: ' + e.message, { tone: 'danger' });
-        }
-    };
-
     // 计算并显示持仓统计
     function calculatePositionSummary() {
         let totalValue = 0;
@@ -1357,8 +1316,6 @@ document.addEventListener('DOMContentLoaded', function () {
     window.openFundSelectionModal = openFundSelectionModal;
     window.closeFundSelectionModal = closeFundSelectionModal;
     window.confirmFundSelection = confirmFundSelection;
-    window.downloadFundMap = downloadFundMap;
-    window.uploadFundMap = uploadFundMap;
     window.addFunds = addFunds;
     window.markHold = markHold;
     window.unmarkHold = unmarkHold;

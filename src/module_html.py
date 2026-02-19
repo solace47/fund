@@ -6,23 +6,11 @@ import re
 
 def enhance_fund_tab_content(content, shares_map=None):
     """
-    Enhance the fund tab content with operations panel, file operations, and shares input.
+    Enhance the fund tab content with operations panel and shares input.
     Args:
         content: HTML content to enhance
         shares_map: Dict mapping fund_code -> shares value (optional)
     """
-    # 添加文件操作和持仓统计区域
-    file_operations = """
-        <div class="file-operations" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button class="btn btn-secondary" onclick="downloadFundMap()" style="padding: 8px 16px;">导出基金列表</button>
-            <input type="file" id="uploadFile" accept=".json" style="display:none" onchange="uploadFundMap(this.files[0])">
-            <button class="btn btn-secondary" onclick="document.getElementById('uploadFile').click()" style="padding: 8px 16px;">导入基金列表</button>
-            <span style="color: #f59e0b; font-size: 13px; margin-left: 10px;">
-                <span style="color: #f59e0b;">注意:</span> 导入/导出为覆盖性操作，直接应用最新配置（非累加）
-            </span>
-        </div>
-    """
-
     # 添加持仓统计区域（将通过JavaScript动态填充）
     position_summary = """
         <div id="positionSummary" class="position-summary" style="display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
@@ -135,7 +123,7 @@ def enhance_fund_tab_content(content, shares_map=None):
     # 匹配完整的表格行（非贪婪匹配行内容）
     content = re.sub(r'<tr>.*?</tr>', add_shares_to_row, content, flags=re.DOTALL)
 
-    return file_operations + operations_panel + add_fund_area + content + fund_details_summary
+    return operations_panel + add_fund_area + content + fund_details_summary
 
 
 def get_top_navbar_html(username=None):
@@ -227,7 +215,8 @@ def get_full_page_html_sidebar(tabs_data, username=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LanFund Terminal</title>
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -282,7 +271,8 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>LanFund Dashboard</title>
+            <title>Fund</title>
+            <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
             {css_style}
             <link rel="stylesheet" href="/static/css/style.css">
         </head>
@@ -340,7 +330,8 @@ def get_full_page_html(tabs_data, username=None, use_sidebar=False):
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
-        <title>LanFund Dashboard</title>
+        <title>Fund</title>
+        <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
         {css_style}
         <link rel="stylesheet" href="/static/css/style.css">
     </head>
@@ -371,7 +362,8 @@ def get_sse_loading_page(css_style):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>LanFund Dashboard - Loading</title>
+        <title>Fund</title>
+        <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
         {css_style}
         <style>
             .loading-container {{
@@ -1840,8 +1832,8 @@ def get_market_page_html(market_data, username=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>市场行情 - LanFund</title>
-    <link rel="icon" href="/static/1.ico">
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
@@ -2251,8 +2243,8 @@ def get_news_page_html(news_content, username=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>7*24快讯 - LanFund</title>
-    <link rel="icon" href="/static/1.ico">
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
@@ -2573,8 +2565,8 @@ def get_precious_metals_page_html(metals_data, username=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>贵金属行情 - LanFund</title>
-    <link rel="icon" href="/static/1.ico">
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -3289,8 +3281,8 @@ def get_market_indices_page_html(market_charts=None, chart_data=None, timing_dat
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>市场指数 - LanFund</title>
-    <link rel="icon" href="/static/1.ico">
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -3747,8 +3739,8 @@ def get_portfolio_page_html(fund_content, fund_map, fund_chart_data=None, fund_c
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>持仓基金 - LanFund</title>
-    <link rel="icon" href="/static/1.ico">
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -4643,8 +4635,8 @@ def get_sectors_page_html(sectors_content, select_fund_content, fund_map, userna
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行业板块 - LanFund</title>
-    <link rel="icon" href="/static/1.ico">
+    <title>Fund</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon-money-weave.svg">
     {css_style}
     <link rel="stylesheet" href="/static/css/style.css">
     <style>

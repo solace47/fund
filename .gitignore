@@ -12,3 +12,4 @@ frontend/dist/
 myfund
 .DS_Store
 src/__pycache__/
+__pycache__/

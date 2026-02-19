@@ -17,7 +17,7 @@ const SECTION_META = {
   'gold-history': { tabId: 'gold', title: '历史金价', showSummary: false, showHeader: false },
   volume: { tabId: 'seven_A', title: '成交量趋势', showSummary: false, showHeader: false },
   timing: { tabId: 'A', title: '上证分时', showSummary: false, showHeader: false },
-  funds: { tabId: 'fund', title: '自选基金', showSummary: true, showHeader: true },
+  funds: { tabId: 'fund', title: '自选基金', showSummary: true, showHeader: false },
   sectors: { tabId: 'bk', title: '行业板块', showSummary: false, showHeader: false },
   query: { tabId: 'select_fund', title: '板块基金查询', showSummary: false, showHeader: false }
 };
@@ -476,12 +476,14 @@ function destroyChart(key) {
 }
 
 function updateLastUpdateTime() {
-  const lastUpdate = document.getElementById('lastUpdate');
-  if (!lastUpdate) {
-    return;
-  }
   const now = new Date();
-  lastUpdate.textContent = `更新于 ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+  const text = `更新于 ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+  ['lastUpdate', 'holdingsLastUpdate'].forEach((id) => {
+    const target = document.getElementById(id);
+    if (target) {
+      target.textContent = text;
+    }
+  });
 }
 
 function getFloatingRefreshEdgeGap() {
@@ -699,22 +701,37 @@ function initFloatingRefreshButton() {
 }
 
 function updateMarketStatus() {
-  const marketStatusText = document.getElementById('marketStatusText');
-  if (!marketStatusText) {
-    return;
-  }
-
   const now = new Date();
   const day = now.getDay();
+  let marketState = 'closed';
+  let marketText = '市场已收盘';
+
   if (day === 0 || day === 6) {
-    marketStatusText.textContent = '休市中';
-    return;
+    marketState = 'rest';
+    marketText = '休市中';
+  } else {
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const openMinutes = 9 * 60 + 30;
+    const closeMinutes = 15 * 60;
+    if (minutes >= openMinutes && minutes < closeMinutes) {
+      marketState = 'open';
+      marketText = '市场开盘中';
+    }
   }
 
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const openMinutes = 9 * 60 + 30;
-  const closeMinutes = 15 * 60;
-  marketStatusText.textContent = minutes >= openMinutes && minutes < closeMinutes ? '市场开盘中' : '市场已收盘';
+  ['marketStatusText', 'holdingsMarketStatusText'].forEach((id) => {
+    const target = document.getElementById(id);
+    if (target) {
+      target.textContent = marketText;
+    }
+  });
+
+  ['marketStatusBadge', 'holdingsMarketStatusBadge'].forEach((id) => {
+    const badge = document.getElementById(id);
+    if (badge) {
+      badge.dataset.marketState = marketState;
+    }
+  });
 }
 
 function showLoading(targetElement) {
@@ -1391,6 +1408,13 @@ async function loadFundsSection(targetElement, force = false) {
         <div class="chart-card">
           <div class="chart-card-header">
             <h3 class="chart-card-title">持仓基金</h3>
+            <div class="chart-header-actions holdings-header-meta">
+              <span class="market-status market-status--prominent" id="holdingsMarketStatusBadge" data-market-state="closed">
+                <span class="status-dot"></span>
+                <span id="holdingsMarketStatusText">市场已收盘</span>
+              </span>
+              <span class="last-update last-update--prominent" id="holdingsLastUpdate">更新于 --:--:--</span>
+            </div>
           </div>
           <div class="chart-card-content">${fundHtml}</div>
         </div>
@@ -1411,6 +1435,8 @@ async function loadFundsSection(targetElement, force = false) {
 
     executeEmbeddedScripts(targetElement);
     syncAllChartRangeButtons(targetElement);
+    updateMarketStatus();
+    updateLastUpdateTime();
     if (typeof window.autoColorize === 'function') {
       window.autoColorize();
     }

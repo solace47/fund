@@ -3,7 +3,6 @@ import os
 os.makedirs("cache", exist_ok=True)
 
 import importlib
-import json
 import threading
 import time
 from pathlib import Path
@@ -11,7 +10,7 @@ from pathlib import Path
 import urllib3
 from dotenv import load_dotenv
 from flask import Flask, request, redirect, jsonify, \
-    send_file, send_from_directory
+    send_from_directory
 from loguru import logger
 
 import fund
@@ -274,62 +273,6 @@ def api_fund_sector_remove():
     except Exception as e:
         logger.error(f"删除板块标记失败: {e}")
         return {'success': False, 'message': f'操作失败: {str(e)}'}
-# ==================== File Upload/Download ====================
-@app.route('/api/fund/upload', methods=['POST'])
-def api_fund_upload():
-    """上传fund_map.json文件"""
-    try:
-        if 'file' not in request.files:
-            return {'success': False, 'message': '未找到上传文件'}
-        file = request.files['file']
-        if file.filename == '':
-            return {'success': False, 'message': '未选择文件'}
-        if not file.filename.endswith('.json'):
-            return {'success': False, 'message': '只支持JSON文件'}
-        # 读取并解析JSON
-        content = file.read().decode('gbk')  # 使用GBK编码
-        fund_map = json.loads(content)
-        # 验证数据格式
-        if not isinstance(fund_map, dict):
-            return {'success': False, 'message': '文件格式错误：应为JSON对象'}
-        for code, fund_data in fund_map.items():
-            if not isinstance(fund_data, dict):
-                return {'success': False, 'message': f'基金{code}数据格式错误'}
-            if 'fund_key' not in fund_data or 'fund_name' not in fund_data:
-                return {'success': False, 'message': f'基金{code}缺少必要字段'}
-        # 保存到数据库
-        user_id = get_current_user_id()
-        success = db.save_user_funds(user_id, fund_map)
-        if success:
-            invalidate_runtime_cache()
-            return {'success': True, 'message': f'成功导入{len(fund_map)}个基金'}
-        else:
-            return {'success': False, 'message': '保存失败'}
-    except json.JSONDecodeError:
-        return {'success': False, 'message': 'JSON格式错误'}
-    except Exception as e:
-        logger.error(f"上传文件失败: {e}")
-        return {'success': False, 'message': f'上传失败: {str(e)}'}
-@app.route('/api/fund/download', methods=['GET'])
-def api_fund_download():
-    """下载fund_map.json文件"""
-    try:
-        user_id = get_current_user_id()
-        fund_map = db.get_user_funds(user_id)
-        # 生成JSON文件
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', encoding='gbk', suffix='.json', delete=False) as f:
-            json.dump(fund_map, f, ensure_ascii=False, indent=4)
-            temp_path = f.name
-        return send_file(
-            temp_path,
-            as_attachment=True,
-            download_name='fund_map.json',
-            mimetype='application/json'
-        )
-    except Exception as e:
-        logger.error(f"下载文件失败: {e}")
-        return {'success': False, 'message': f'下载失败: {str(e)}'}
 # ==================== Shares Management ====================
 @app.route('/api/fund/shares', methods=['POST'])
 def api_fund_shares():

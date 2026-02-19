@@ -3170,6 +3170,68 @@ body::before {
     margin-left: auto;
 }
 
+.holdings-header-meta {
+    gap: 10px;
+    align-items: center;
+}
+
+.market-status--prominent {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(128, 145, 174, 0.46);
+    background: linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #334155;
+    box-shadow: 0 1px 5px rgba(66, 89, 130, 0.12);
+}
+
+.market-status--prominent .status-dot {
+    width: 8px;
+    height: 8px;
+    background: #9ca3af;
+}
+
+.market-status--prominent[data-market-state="open"] {
+    color: #0f766e;
+    border-color: rgba(16, 185, 129, 0.34);
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.market-status--prominent[data-market-state="open"] .status-dot {
+    background: #10b981;
+}
+
+.market-status--prominent[data-market-state="closed"],
+.market-status--prominent[data-market-state="rest"] {
+    color: #a16207;
+    border-color: rgba(245, 158, 11, 0.34);
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.market-status--prominent[data-market-state="closed"] .status-dot,
+.market-status--prominent[data-market-state="rest"] .status-dot {
+    background: #f59e0b;
+}
+
+.last-update--prominent {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(122, 142, 176, 0.38);
+    background: linear-gradient(180deg, #ffffff 0%, #f1f5fd 100%);
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: 0 1px 5px rgba(66, 89, 130, 0.1);
+}
+
 .chart-range {
     display: inline-flex;
     align-items: center;
@@ -3234,6 +3296,16 @@ body::before {
     .chart-header-actions {
         width: 100%;
         justify-content: flex-start;
+    }
+
+    .holdings-header-meta {
+        justify-content: flex-end;
+    }
+
+    .market-status--prominent,
+    .last-update--prominent {
+        font-size: 11px;
+        padding: 5px 10px;
     }
 
     .chart-selector {
