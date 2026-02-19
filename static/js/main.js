@@ -1012,6 +1012,35 @@ document.addEventListener('DOMContentLoaded', function () {
         let settledValue = 0;
         const today = new Date().toISOString().split('T')[0];
 
+        function isFundMarkedHold(fundCode) {
+            if (window.fundHoldStatusData && Object.prototype.hasOwnProperty.call(window.fundHoldStatusData, fundCode)) {
+                return Boolean(window.fundHoldStatusData[fundCode]);
+            }
+            const shares = (window.fundSharesData && window.fundSharesData[fundCode]) || 0;
+            return shares > 0;
+        }
+
+        function countMarkedHoldFunds() {
+            if (window.fundHoldStatusData) {
+                let count = 0;
+                for (const isHold of Object.values(window.fundHoldStatusData)) {
+                    if (isHold) {
+                        count++;
+                    }
+                }
+                return count;
+            }
+            let count = 0;
+            if (window.fundSharesData) {
+                for (const code in window.fundSharesData) {
+                    if (window.fundSharesData[code] > 0) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
         // 存储每个基金的详细涨跌信息
         const fundDetailsData = [];
 
@@ -1024,6 +1053,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // 获取基金代码（第一列）
             const codeCell = cells[0];
             const fundCode = codeCell.textContent.trim();
+
+            // 仅统计已标记持有的基金
+            if (!isFundMarkedHold(fundCode)) return;
 
             // 从全局数据获取份额
             const shares = (window.fundSharesData && window.fundSharesData[fundCode]) || 0;
@@ -1167,15 +1199,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // 更新持仓数量
         const holdCountEl = document.getElementById('holdCount');
         if (holdCountEl) {
-            // 从全局数据计算持仓数量
-            let heldCount = 0;
-            if (window.fundSharesData) {
-                for (const code in window.fundSharesData) {
-                    if (window.fundSharesData[code] > 0) {
-                        heldCount++;
-                    }
-                }
-            }
+            const heldCount = countMarkedHoldFunds();
             holdCountEl.textContent = heldCount + ' 只';
         }
 
@@ -1216,15 +1240,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Update new summary bar if it exists (sidebar layout)
         const summaryBar = document.getElementById('summaryBar');
         if (summaryBar) {
-            // Count held funds from global data
-            let heldCount = 0;
-            if (window.fundSharesData) {
-                for (const code in window.fundSharesData) {
-                    if (window.fundSharesData[code] > 0) {
-                        heldCount++;
-                    }
-                }
-            }
+            const heldCount = countMarkedHoldFunds();
 
             // Update total value
             const summaryTotalValue = document.getElementById('summaryTotalValue');
@@ -1292,9 +1308,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 // 初始化全局份额数据存储
                 window.fundSharesData = {};
                 window.fundSectorsData = {};  // 存储板块数据
+                window.fundHoldStatusData = {};  // 存储持有标记状态
 
                 // 填充份额数据到全局存储
                 for (const [code, data] of Object.entries(fundData)) {
+                    window.fundHoldStatusData[code] = Boolean(data.is_hold);
                     if (data.shares !== undefined && data.shares !== null) {
                         window.fundSharesData[code] = parseFloat(data.shares) || 0;
                     }

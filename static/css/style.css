@@ -544,8 +544,8 @@ a:hover {
 .style-table th.sortable::after {
     content: '↕';
     display: inline-block;
-    margin-left: 6px;
-    font-size: 0.8em;
+    margin-left: 8px;
+    font-size: 1em;
     color: var(--text-muted);
     transition: color var(--transition-fast);
 }

@@ -1191,7 +1191,7 @@ def get_css_style():
             content: '↕';
             display: inline-block;
             margin-left: 8px;
-            font-size: 0.8em;
+            font-size: 1em;
             color: var(--text-muted);
         }
 
